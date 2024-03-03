@@ -1,0 +1,17 @@
+[global]
+	enable_posix_regex = true
+	origin = bottom-right 
+	offset = 10x50
+	transparency = 30	
+	corner_radius = 7
+	frame_width = 1
+	gap_size = 10
+	#idle_threshold = 
+	font = hack 10
+	#format
+#	icon_path = /home/ivan/.local/share/icons/Papirus-Dark/16x16/status
+	icon_theme Papirus-Dark
+	corner_radius = 7
+[urgency]
+	background = "#181818"
+	frame_color = "#d90000"

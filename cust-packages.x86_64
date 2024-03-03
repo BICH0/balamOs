@@ -1,0 +1,101 @@
+base
+linux
+mkinitcpio
+memtest86+
+memtest86+-efi
+;;---FS---
+xfsprogs
+e2fsprogs
+ntfs-3g
+dosfstools
+nbd
+;;--Keyrings--
+archlinux-keyring
+blackarch-keyring
+;;---Misc---
+dhcpcd
+openssh
+inetutils
+nano ;;Text editor, may change it/add nvim
+ranger ;;TUI based file explorer
+imagemagick ;;Image viewer/manipulation program
+neofetch
+networkmanager
+net-tools ;;Add support for netstat,route,arp...
+wget ;;CLI Tool for making requests and download content from FTP/HTTP(S)
+sudo
+zsh
+rsync ;;File transfer via SSH using compresion
+netcat ;;Read/write to TCP/UDP ports
+openvpn ;;Openvpn client
+;;---Fonts---
+noto-fonts-emoji
+ttf-hack-nerd
+;;AUR
+yay
+lightdm-mini-greeter
+vscodium
+;;LiveISO specific
+edk2-shell
+findutils
+arch-install-scripts
+mkinitcpio-archiso
+mkinitcpio-nfs-utils
+syslinux
+squashfs-tools
+pv
+intel-ucode
+amd-ucode
+;;VM specific
+virtualbox-guest-utils
+open-vm-tools
+qemu-guest-agent
+;;X
+xorg
+xf86-video-amdgpu
+xf86-video-ati
+nvidia
+xf86-video-intel
+xclip
+;;Programming
+python
+python2
+npm
+breeze-gtk
+;;DEV
+base-devel
+git
+;;DisplayManager
+lightdm
+;;DE specific
+xss-lock
+i3-wm
+i3lock
+dex
+polybar
+dunst
+jgmenu
+network-manager-applet
+scrot
+;;GUI apps
+firefox
+okular
+kitty
+mpv
+feh
+;;Wireless
+aircrack-ng
+;;MITM
+bettercap
+;;Recon
+nmap
+wireshark-qt
+burpsuite
+gobuster
+;;Reverse Enegeering
+ghidra
+python-uncompyle6
+;;avaloniailspy
+;;BruteForce
+hashcat
+wordlistctl

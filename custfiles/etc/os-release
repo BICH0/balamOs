@@ -1,0 +1,11 @@
+NAME="Balam Os"
+PRETTY_NAME="Balam Os"
+ID=balamos
+BUILD_ID=rolling
+ANSI_COLOR="0;31"
+HOME_URL="https://balamos.confugiradores.es/"
+DOCUMENTATION_URL="https://balamos.confugiradores.es/documentation/"
+SUPPORT_URL="https://discord.gg/invite/9aqHgCT7jm"
+BUG_REPORT_URL="https://github.com/BICH0/balamOs/issues"
+PRIVACY_POLICY_URL="https://balamos.confugiradores.es/documentation/#privacy-policy"
+LOGO=balamos-logo

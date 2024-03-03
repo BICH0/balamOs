@@ -1,0 +1,16 @@
+##
+## User privilege specification
+##
+root ALL=(ALL:ALL) ALL
+balam ALL=(ALL:ALL) ALL
+
+## Uncomment to allow members of group wheel to execute any command
+# %wheel ALL=(ALL:ALL) ALL
+
+## Same thing without a password
+# %wheel ALL=(ALL:ALL) NOPASSWD: ALL
+
+## Uncomment to allow members of group sudo to execute any command
+# %sudo ALL=(ALL:ALL) ALL
+
+@includedir /etc/sudoers.d

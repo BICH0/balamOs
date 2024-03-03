@@ -1,0 +1,49 @@
+# BunsenLabs Main Menu
+
+@text,,6,6,150,20,2,left,top,auto,#000000 0,<span size="large">🔍︎</span>
+@search,,24,3,150,20,2,left,top,auto,#000000 0,Type to Search
+
+^sep()
+Run Program,gmrun
+^sep()
+Terminal,kitty
+Web Browser,firefox
+File Manager,kitty -e ranger
+VSCodium,vscodium
+Media Player,kitty --hold -e mpv
+^sep()
+Applications,^checkout(apps)
+^sep()
+Recon,^checkout(recon)
+Reverse Engineering,^checkout(reverse)
+Vulnerability/Exploitation,^checkout(exploit)
+Bruteforce,^checkout(brute)
+^sep()
+Install,
+Logout,i3-msg exit
+Power Options,^checkout(powermenu)
+Close,
+
+^tag(recon)
+Nmap,kitty -e --hold nmap -h
+Gobuster,kitty -e --hold gobuster -h
+Wireshark,wireshark
+BurpSuite,burpsuite
+
+^tag(reverse)
+Ghidra,ghidra
+Uncompyle6,kitty -e uncompyle6 -h
+AvaloniailSpy,avaloniailspy
+
+^tag(exploit)
+Metasploit,metasploit
+
+^tag(brute)
+Hashcat,kitty -e --hold hashcat --help
+Wordlistctl,kitty -e --hold wordlistctl
+
+^tag(powermenu)
+Restart,init 6
+Poweroff,init 0
+
+^tag(apps)

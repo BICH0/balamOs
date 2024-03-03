@@ -1,0 +1,170 @@
+TERM Eterm
+TERM ansi
+TERM *color*
+TERM con[0-9]*x[0-9]*
+TERM cons25
+TERM console
+TERM cygwin
+TERM *direct*
+TERM dtterm
+TERM gnome
+TERM hurd
+TERM jfbterm
+TERM konsole
+TERM kterm
+TERM linux
+TERM linux-c
+TERM mlterm
+TERM putty
+TERM rxvt*
+TERM screen*
+TERM st
+TERM terminator
+TERM tmux*
+TERM vt100
+TERM xterm*
+TERM alacritty
+# Attribute codes:
+# 00=none 01=bold 04=underscore 05=blink 07=reverse 08=concealed
+# Text color codes:
+# 30=black 31=red 32=green 33=yellow 34=blue 35=magenta 36=cyan 37=white
+# Background color codes:
+# 40=black 41=red 42=green 43=yellow 44=blue 45=magenta 46=cyan 47=white
+NORMAL 00;37 # no color code at all
+FILE 00;37 # regular file: use no color at all
+RESET 00;37 # reset to "normal" color
+DIR 01;91 # directory
+LINK 04;91 # symbolic link. (If you set this to 'target' instead of a
+ # numerical value, the color is as for the file pointed to.)
+MULTIHARDLINK 00 # regular file with more than one link
+FIFO 01;10 # pipe
+SOCK 01;10 # socket
+DOOR 01;10 # door
+BLK 40;33;01 # block device driver
+CHR 40;33;01 # character device driver
+ORPHAN 09;91 # symlink to nonexistent file, or non-stat'able file ...
+MISSING 00 # ... and the files they point to
+SETUID 02;31 # file that is setuid (u+s)
+SETGID 02;91 # file that is setgid (g+s)
+CAPABILITY 30;41 # file with capability
+STICKY_OTHER_WRITABLE 30;42 # dir that is sticky and other-writable (+t,o+w)
+OTHER_WRITABLE 01;91 # dir that is other-writable (o+w) and not sticky
+STICKY 37;44 # dir with the sticky bit set (+t) and not other-writable
+# This is for files with execute permission:
+EXEC 01;41
+# List any file extensions like '.gz' or '.tar' that you would like ls
+# to colorize below. Put the extension, a space, and the color init string.
+.tar 01;93
+.tgz 01;93
+.arc 01;93
+.arj 01;93
+.taz 01;93
+.lha 01;93
+.lz4 01;93
+.lzh 01;93
+.lzma 01;93
+.tlz 01;93
+.txz 01;93
+.tzo 01;93
+.t7z 01;93
+.zip 01;93
+.z 01;93
+.dz 01;93
+.gz 01;93
+.lrz 01;93
+.lz 01;93
+.lzo 01;93
+.xz 01;93
+.zst 01;93
+.tzst 01;93
+.bz2 01;93
+.bz 01;93
+.tbz 01;93
+.tbz2 01;93
+.tz 01;93
+.deb 01;93
+.rpm 01;93
+.jar 01;93
+.war 01;93
+.ear 01;93
+.sar 01;93
+.rar 01;93
+.alz 01;93
+.ace 01;93
+.zoo 01;93
+.cpio 01;93
+.7z 01;93
+.rz 01;93
+.cab 01;93
+.wim 01;93
+.swm 01;93
+.dwm 01;93
+.esd 01;93
+# image formats
+.jpg 01;96
+.jpeg 01;96
+.mjpg 01;96
+.mjpeg 01;96
+.gif 01;96
+.bmp 01;96
+.pbm 01;96
+.pgm 01;96
+.ppm 01;96
+.tga 01;96
+.xbm 01;96
+.xpm 01;96
+.tif 01;96
+.tiff 01;96
+.png 01;96
+.svg 01;96
+.svgz 01;96
+.mng 01;96
+.pcx 01;96
+.mov 01;96
+.mpg 01;96
+.mpeg 01;96
+.m2v 01;96
+.mkv 01;96
+.webm 01;96
+.webp 01;96
+.ogm 01;96
+.mp4 01;96
+.m4v 01;96
+.mp4v 01;96
+.vob 01;96
+.qt 01;96
+.nuv 01;96
+.wmv 01;96
+.asf 01;96
+.rm 01;96
+.rmvb 01;96
+.flc 01;96
+.avi 01;96
+.fli 01;96
+.flv 01;96
+.gl 01;96
+.dl 01;96
+.xcf 01;96
+.xwd 01;96
+.yuv 01;96
+.cgm 01;96
+.emf 01;96
+.ogv 01;96
+.ogx 01;96
+# audio formats
+.aac 00;95
+.au 00;95
+.flac 00;95
+.m4a 00;95
+.mid 00;95
+.midi 00;95
+.mka 00;95
+.mp3 00;95
+.mpc 00;95
+.ogg 00;95
+.ra 00;95
+.wav 00;95
+.oga 00;95
+.opus 00;95
+.spx 00;95
+.xspf 00;95

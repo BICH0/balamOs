@@ -1,0 +1,6 @@
+[submodule "custfiles/usr/share/icons/balam-cursors"]
+	path = custfiles/usr/share/icons/balam-cursors
+	url = https://github.com/BICH0/balam-cursors.git
+[submodule "custfiles/usr/share/oh-my-zsh"]
+	path = custfiles/usr/share/oh-my-zsh
+	url = https://github.com/ohmyzsh/ohmyzsh.git

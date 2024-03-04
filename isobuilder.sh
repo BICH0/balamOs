@@ -1,4 +1,5 @@
 #!/bin/bash
+REPO="BICH0/balamOs/master/"
 WORKDIR="."
 function checkOutput {
 	if [[ $? -eq 0 ]]
@@ -8,6 +9,7 @@ function checkOutput {
 		echo -en " [ \e[0;31mERROR $?"
 	fi
 	echo -e "\e[0m]"
+	return $?
 }
 function info {
 	echo -e "\n[\e[0;35mINFO\e[0m] $1"
@@ -39,9 +41,29 @@ fi
 mkdir ${WORKDIR}/liveiso 2>/dev/null
 mkdir -p ${WORKDIR}/liveiso/airootfs/etc/skel
 mkdir -p ${WORKDIR}/liveiso/airootfs/usr/share/balamos-install/data/
+ABS_PATH=$(cd ${WORKDIR}; pwd)
 
 info "Copying releng into liveiso"
-bulkMove "${WORKDIR}/releng/" "${WORKDIR}/liveiso/"
+for ((i=0;i<=1;i++))
+do
+	bulkMove "${WORKDIR}/releng/" "${WORKDIR}/liveiso/"
+	if [ $? -ne 0 ]
+	then
+		releng="/usr/share/archiso/configs/releng"
+		if [ -d $releng ]
+		then
+			echo -n " - Copying releng from /usr/share"
+			cp -r $releng ${WORKDIR}/releng
+			checkOutput $?
+			if [ $? -eq 0 ]
+			then
+				continue	
+			fi
+		fi
+		echo -e "\e[0;31m[ERROR] Unable to locate or copy releng, verify archiso is installed\e[0m"
+		exit 1
+	fi
+done
 
 info "Setting liveiso makefiles"
 bulkMove "${WORKDIR}/isomakefiles/" "${WORKDIR}/liveiso/"
@@ -114,8 +136,48 @@ echo -n " - Setting permissions"
 chmod 755 $installerPath
 checkOutput
 
-info "Patching custom-repo path"
-sed -i "s|\${WORKDIR}|$(cd ${WORKDIR};pwd)|g" ${WORKDIR}/liveiso/pacman.conf 
+info "Adding oh-my-zsh themes"
+for file in 'balamos.zsh-theme' 'balamosr.zsh-theme'
+do
+	if [ ! -f "${WORKDIR}/$file" ]
+	then
+		echo -n " - Downloading $file"
+		curl "https://raw.githubusercontent.com/$REPO/$file" > ${WORKDIR}/$file
+		checkOutput $?
+		if [ $? -ne 0 ]
+		then
+			echo -e "\e[0;31m[ERROR]\e[0m Could not fetch $file"
+		fi
+	fi
+	echo -n " - Copying $file"
+	cp "${WORKDIR}/$file" "${WORKDIR}/liveiso/airootfs/usr/share/oh-my-zsh/themes/"
+	checkOutput $?
+done
+
+info "Patching custom-repo"
+if [ ! -d "${WORKDIR}/customrepo" ]
+then
+	echo -e "\e[0;31m[ERROR] Custom repo doesn't exist, installation will fail\e[0m"
+	exit 1
+fi
+echo -n " - Applying path"
+sed -i "s|\${WORKDIR}|$ABS_PATH|g" ${WORKDIR}/liveiso/pacman.conf 
+checkOutput $?
+echo " - Fixing links"
+for link in 'micro-aur.db' 'micro-aur.files'
+do
+	target="${WORKDIR}/customrepo/${link}"
+	if [ ! -L "$target" ]
+	then
+		echo -n "   - $link"
+		if [ -e "$target" ]
+		then
+			rm $target
+		fi
+		ln -s $ABS_PATH/customrepo/micro-aur.db.tar.gz $target
+		checkOutput $?
+	fi
+done
 
 info "Fetching packages"
 >./packages.x86_64

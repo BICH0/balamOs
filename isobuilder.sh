@@ -2,14 +2,20 @@
 REPO="BICH0/balamOs/master/"
 WORKDIR="."
 function checkOutput {
-	if [[ $? -eq 0 ]]
+	if [ -z "$1" ]
+	then
+		ecode=$?
+	else
+		ecode=$1
+	fi
+	if [[ $ecode -eq 0 ]]
 	then
 		echo -en " [\e[0;32mOK"
 	else
-		echo -en " [ \e[0;31mERROR $?"
+		echo -en " [\e[0;31mERROR $ecode"
 	fi
 	echo -e "\e[0m]"
-	return $?
+	return $ecode
 }
 function info {
 	echo -e "\n[\e[0;35mINFO\e[0m] $1"
@@ -54,7 +60,7 @@ do
 		then
 			echo -n " - Copying releng from /usr/share"
 			cp -r $releng ${WORKDIR}/releng
-			checkOutput $?
+			checkOutput
 			if [ $? -eq 0 ]
 			then
 				continue	
@@ -90,7 +96,7 @@ then
 	do
 		echo -n " - Creating $path"
 		mkdir -p ${WORKDIR}/liveiso/airootfs/$path &>/dev/null
-		checkOutput $?
+		checkOutput
 		bulkMove ${WORKDIR}/liveiso/airootfs/etc/skel/ ${WORKDIR}/liveiso/airootfs/$path
 	done
 fi
@@ -143,7 +149,7 @@ do
 	then
 		echo -n " - Downloading $file"
 		curl "https://raw.githubusercontent.com/$REPO/$file" > ${WORKDIR}/$file
-		checkOutput $?
+		checkOutput
 		if [ $? -ne 0 ]
 		then
 			echo -e "\e[0;31m[ERROR]\e[0m Could not fetch $file"
@@ -151,7 +157,7 @@ do
 	fi
 	echo -n " - Copying $file"
 	cp "${WORKDIR}/$file" "${WORKDIR}/liveiso/airootfs/usr/share/oh-my-zsh/themes/"
-	checkOutput $?
+	checkOutput
 done
 
 info "Patching custom-repo"
@@ -162,23 +168,127 @@ then
 fi
 echo -n " - Applying path"
 sed -i "s|\${WORKDIR}|$ABS_PATH|g" ${WORKDIR}/liveiso/pacman.conf 
-checkOutput $?
+checkOutput
 echo " - Fixing links"
 for link in 'micro-aur.db' 'micro-aur.files'
 do
 	target="${WORKDIR}/customrepo/${link}"
+	echo -n "   - $link"
 	if [ ! -L "$target" ]
 	then
-		echo -n "   - $link"
 		if [ -e "$target" ]
 		then
 			rm $target
 		fi
 		ln -s $ABS_PATH/customrepo/micro-aur.db.tar.gz $target
-		checkOutput $?
+		checkOutput
+	else
+		checkOutput
 	fi
 done
 
+info "Creating build user"
+useradd balambuild -M -r -s /bin/bash
+echo "build" | passwd balambuild --stdin
+info "Downloading and building customrepo packages"
+cd ${WORKDIR}/customrepo
+for pkg in $(cat ./packages.list)
+do
+	if [[ ! "$pkg" =~ ^.+\.git$ ]]
+	then
+		echo "   - Skipping $pkg, wrong format, must be git repo"
+		continue
+	fi
+	name=${pkg##*/}
+	name=${name%%.*}
+	pkgpath="$(pwd)/${name}"
+	if [ ! -z $(find . -regex ".*\/$name-.+\.pkg\.tar\.zst") ]
+	then
+		echo "   - Skipping $pkg, compiled package already exists."
+		continue
+	fi
+	if [ -d $pkgpath ]
+	then
+		echo -n "   - Previous build directory found, deleting it"
+		rm -rf $pkgpath
+		checkOutput
+
+	fi
+	echo -en "  [${name}]\n    - Cloning repo"
+	git clone --quiet $pkg
+	checkOutput
+	if [ $? -ne 0 ]
+	then
+		continue
+	fi
+	echo -n "    - Changing user permissions"
+	chown -R balambuild: $pkgpath
+	if [ "$(ls -l ${pkgpath} | grep $name | cut -f3 -d" ")" != "balambuild" ]
+	then
+		echo -e " \e[0;31m[ERROR]\n         \-> Unable to change permissions, verify that the partition isn't ntfs\e[0m"
+		ntfsusers=()
+		for user in $(grep : $(df . | tr -s " " | tail +2 | cut -f6 -d" ")/.NTFS-3G/UserMapping 2>/dev/null | cut -f1 -d:)
+		do
+			if [ ! -z "$user" ] && [ ! -z "$(grep $user /etc/passwd)" ]
+			then
+				ntfsusers+=($user)
+			fi
+		done
+		if [ -z $ntfsusers ]
+		then
+			rm -r $pkgpath
+			continue
+		fi
+		if [ "${#ntfsusers[@]}" -eq 1 ]
+		then
+			builduser=${ntfsusers[0]}
+		else
+			builduser="0"
+		fi
+		while [[ ! ${ntfsusers[@]} =~ $builduser ]]
+		do
+			echo -n "Choose a ntfs-3g mapped user [${ntfsusers[@]}]: "
+			read -r builduser
+		done
+		chown -R $builduser: $pkgpath
+	else
+		builduser="builduser"
+		checkOutput 0
+	fi
+	echo -n "    - Changing to build directory"
+	pushd $pkgpath &>/dev/null
+	checkOutput
+	if [ $? -ne 0 ]
+	then
+		rm -r $pkgpath
+		echo -e "\e[0;31mUnable to access environment, exiting\e[0m"
+		continue
+	fi
+	echo -n "    - Building package"
+	su $builduser -c "makepkg -sr 1>/dev/null"
+	checkOutput
+	if [ $? -eq 0 ]
+	then
+		echo -n "      - Updating micro-aur database"
+		files=$(find . -regex .+\.pkg\.tar\.zst)
+		if [ $(echo "$files" | wc -l) -gt 1 ]
+		then
+			files=$(echo "$files" | head -1)
+			echo -e "\e[0;32m[WARN]\e[0m\n      More than one file found, using first one $files\n      - Adding package"
+		fi
+		mv $files ../
+		repo-add "../micro-aur.db.tar.gz" "../${files:2}"
+		checkOutput
+	fi
+	echo -n "   - Cleaning build dir"
+	rm -rf $pkgpath
+	checkOutput
+	popd &>/dev/null
+done
+info "Cleaning build environment"
+userdel balambuild
+rm *.old 2>/dev/null
+cd ..
 info "Fetching packages"
 >./packages.x86_64
 while read -r line

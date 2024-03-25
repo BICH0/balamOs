@@ -2,7 +2,7 @@ eval $(dircolors $HOME/.config/dircolors)
 export ZSH=/usr/share/oh-my-zsh
 export EDITOR="nano"
 
-ZSH_THEME="b1ch0"
+ZSH_THEME="balamos"
 
 # Uncomment one of the following lines to change the auto-update behavior
 # zstyle ':omz:update' mode disabled  # disable automatic updates

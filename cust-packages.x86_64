@@ -1,3 +1,4 @@
+;;20/03/2024-0
 base
 linux
 mkinitcpio
@@ -34,7 +35,7 @@ ttf-hack-nerd
 ;;AUR
 yay
 lightdm-mini-greeter
-vscodium
+vscodium-bin
 ;;LiveISO specific
 edk2-shell
 findutils
@@ -70,7 +71,7 @@ lightdm
 ;;DE specific
 xss-lock
 i3-wm
-i3lock
+i3lock-color ;;Change for i3lock-colors from microaur
 dex
 polybar
 dunst
@@ -99,3 +100,5 @@ python-uncompyle6
 ;;BruteForce
 hashcat
 wordlistctl
+;;Anti-obfuscation
+perl-image-exiftool

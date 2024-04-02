@@ -183,7 +183,7 @@ bindsym $mod+g gaps inner 0;gaps outer 0
 bindsym $mod+Shift+g gaps outer 5px;gaps inner 30px
 
 # launchig feh (background)
-exec --no-startup-id feh --bg-scale /usr/share/backgrounds/shigaraki.jpg
+exec --no-startup-id feh --bg-fill /usr/share/backgrounds/balam01.png
 
 # launching polybar
 exec_always --no-startup-id ~/.config/i3/polybar.sh &

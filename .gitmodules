@@ -4,3 +4,6 @@
 [submodule "custfiles/usr/share/oh-my-zsh"]
 	path = custfiles/usr/share/oh-my-zsh
 	url = https://github.com/ohmyzsh/ohmyzsh.git
+[submodule "isomakefiles/grub/themes/balam-grub"]
+	path = isomakefiles/grub/themes/balam-grub
+	url = https://github.com/BiCH0/balam-grub

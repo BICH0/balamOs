@@ -1,6 +1,14 @@
 #!/bin/bash
-REPO="BICH0/balamOs/master/"
+REPO="BICH0/balamOs"
+BRANCH="master"
 WORKDIR="."
+
+trap cleanup SIGINT
+
+function cleanup {
+	rm -rf ${WORKDIR}/workdir 2>/dev/null
+}
+
 function checkOutput {
 	if [ -z "$1" ]
 	then
@@ -70,6 +78,12 @@ do
 		exit 1
 	fi
 done
+
+if [ ! -f ${WORKDIR}/isomakefiles/syslinux/splash.png ]
+then
+	info "Adding splash to syslinux"
+	mv ${WORKDIR}/isomakefiles/grub/themes/balam-grub/splash.png ${WORKDIR}/isomakefiles/syslinux/splash.png
+fi
 
 info "Setting liveiso makefiles"
 bulkMove "${WORKDIR}/isomakefiles/" "${WORKDIR}/liveiso/"
@@ -148,7 +162,7 @@ do
 	if [ ! -f "${WORKDIR}/$file" ]
 	then
 		echo -n " - Downloading $file"
-		curl "https://raw.githubusercontent.com/$REPO/$file" > ${WORKDIR}/$file
+		curl "https://raw.githubusercontent.com/$REPO/$BRANCH/$file" > ${WORKDIR}/$file
 		checkOutput
 		if [ $? -ne 0 ]
 		then

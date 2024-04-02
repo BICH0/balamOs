@@ -81,8 +81,12 @@ do
 	fi
 done
 
-info "Updating submodules"
-git pull --recurse-submodules
+if [ ! -f ${WORKDIR}/isomakefiles/grub/themes/balam-grub/theme.txt ]
+then
+	info "Updating submodules"
+	git submodule init --quiet
+	git submodule update --quiet
+fi
 
 if [ ! -f ${WORKDIR}/isomakefiles/syslinux/splash.png ]
 then

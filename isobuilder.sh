@@ -6,7 +6,9 @@ WORKDIR="."
 trap cleanup SIGINT
 
 function cleanup {
+	echo "[WARNING] CLEANING UP, PLEASE WAIT"
 	rm -rf ${WORKDIR}/workdir 2>/dev/null
+	exit 1
 }
 
 function checkOutput {
@@ -157,6 +159,10 @@ chmod 755 $installerPath
 checkOutput
 
 info "Adding oh-my-zsh themes"
+if [ ! -d ${WORKDIR}/liveiso/airootfs/usr/share/oh-my-zsh/themes/ ]
+then
+	mkdir -p ${WORKDIR}/liveiso/airootfs/usr/share/oh-my-zsh/themes/
+fi
 for file in 'balamos.zsh-theme' 'balamosr.zsh-theme'
 do
 	if [ ! -f "${WORKDIR}/$file" ]
@@ -202,7 +208,7 @@ do
 done
 
 info "Creating build user"
-useradd balambuild -M -r -s /bin/bash
+useradd balambuild -M -r -s /bin/bash &>/dev/null
 echo "build" | passwd balambuild --stdin
 info "Downloading and building customrepo packages"
 cd ${WORKDIR}/customrepo
@@ -216,7 +222,7 @@ do
 	name=${pkg##*/}
 	name=${name%%.*}
 	pkgpath="$(pwd)/${name}"
-	if [ ! -z $(find . -regex ".*\/$name-.+\.pkg\.tar\.zst") ]
+	if [ ! -z "$(find . -regex ".*\/$name-.+\.pkg\.tar\.zst")" ]
 	then
 		echo "   - Skipping $pkg, compiled package already exists."
 		continue
@@ -231,15 +237,17 @@ do
 	echo -en "  [${name}]\n    - Cloning repo"
 	git clone --quiet $pkg
 	checkOutput
-	if [ $? -ne 0 ]
+	if [ ! -d $pkgpath ]
 	then
+		echo " \-> Unable to download, verify that $pkg is correctly written"
 		continue
-	fi
+	fi 
 	echo -n "    - Changing user permissions"
 	chown -R balambuild: $pkgpath
-	if [ "$(ls -l ${pkgpath} | grep $name | cut -f3 -d" ")" != "balambuild" ]
+	owner=$(ls -l $pkgpath | tail +2 | cut -f3 -d" " | head -1)
+	if [ "$owner" != "balambuild" ]
 	then
-		echo -e " \e[0;31m[ERROR]\n         \-> Unable to change permissions, verify that the partition isn't ntfs\e[0m"
+		echo -e " \e[0;31m[ERROR]\n         \-> Unable to change permissions (Owned by $owner), verify that the partition isn't ntfs\e[0m"
 		ntfsusers=()
 		for user in $(grep : $(df . | tr -s " " | tail +2 | cut -f6 -d" ")/.NTFS-3G/UserMapping 2>/dev/null | cut -f1 -d:)
 		do
@@ -266,7 +274,7 @@ do
 		done
 		chown -R $builduser: $pkgpath
 	else
-		builduser="builduser"
+		builduser="balambuild"
 		checkOutput 0
 	fi
 	echo -n "    - Changing to build directory"

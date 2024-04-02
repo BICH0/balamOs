@@ -81,6 +81,9 @@ do
 	fi
 done
 
+info "Updating submodules"
+git pull --recurse-submodules
+
 if [ ! -f ${WORKDIR}/isomakefiles/syslinux/splash.png ]
 then
 	info "Adding splash to syslinux"

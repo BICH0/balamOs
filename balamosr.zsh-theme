@@ -1,2 +1,3 @@
-<a href="/BICH0/balamOs/master/balamosr.zsh-theme">Moved Permanently</a>.
-
+PROMPT=$'%{\e[38;5;9m%}%B┌─[%b%{\e[0m%}%{\e[38;5;9m%}%n%{\e[38;5;9m%}💀%{\e[0m%}%{\e[38;5;9m%}%m%{\e[38;5;9m%}%B]%b%{\e[38;5;9m%}%B─[%b%{\e[1;37m%}%~%{\e[38;5;9m%}%B]%b%{\e[0m%}
+%{\e[38;5;9m%}%B└─%B[%{\e[0m%}$(git_prompt_info)%{\e[38;5;9m%}%B]=>%{\e[0m%}%b '
+PS2=$' \e[0;34m%]%B>%{\e[0m%}%b '

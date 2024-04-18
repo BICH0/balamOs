@@ -100,7 +100,7 @@ done
 info "Updating submodules"
 if [ ! -f ${WORKDIR}/isomakefiles/grub/themes/balam-grub/theme.txt ]
 then
-	git submodule init --quiet --recursive
+	git submodule init --quiet
 fi
 echo -n " - Updating"
 git submodule update --quiet --remote --recursive

@@ -1,4 +1,4 @@
-;;20/03/2024-0
+;;16/04/2024-0
 base
 linux
 mkinitcpio
@@ -10,7 +10,7 @@ e2fsprogs
 ntfs-3g
 dosfstools
 nbd
-;;--Keyrings--
+;;---Keyrings---
 archlinux-keyring
 blackarch-keyring
 ;;---Misc---
@@ -19,7 +19,6 @@ openssh
 inetutils
 nano ;;Text editor, may change it/add nvim
 ranger ;;TUI based file explorer
-imagemagick ;;Image viewer/manipulation program
 neofetch
 networkmanager
 net-tools ;;Add support for netstat,route,arp...
@@ -31,12 +30,13 @@ netcat ;;Read/write to TCP/UDP ports
 openvpn ;;Openvpn client
 ;;---Fonts---
 noto-fonts-emoji
+otf-droid-nerd
 ttf-hack-nerd
-;;AUR
+;;---AUR---
 yay
 lightdm-mini-greeter
 vscodium-bin
-;;LiveISO specific
+;;---LiveISO specific---
 edk2-shell
 findutils
 arch-install-scripts
@@ -47,58 +47,72 @@ squashfs-tools
 pv
 intel-ucode
 amd-ucode
-;;VM specific
+;;---VM specific---
 virtualbox-guest-utils
 open-vm-tools
 qemu-guest-agent
-;;X
+intel-opencl-runtime
+;;---X---
+mesa
 xorg
-xf86-video-amdgpu
-xf86-video-ati
-nvidia
-xf86-video-intel
+;;xf86-video-amdgpu
+;;xf86-video-ati
+;;nvidia
+;;xf86-video-intel
 xclip
-;;Programming
+;;---Programming---
 python
 python2
+python-setuptools
 npm
 breeze-gtk
-;;DEV
+rvm
+;;---DEV---
 base-devel
 git
-;;DisplayManager
+;;---DisplayManager---
 lightdm
-;;DE specific
+;;---DE specific---
 xss-lock
 i3-wm
 i3lock-color ;;Change for i3lock-colors from microaur
 dex
 polybar
 dunst
-jgmenu
+rofi
+rofi-greenclip
 network-manager-applet
-scrot
-;;GUI apps
+flameshot
+;;---GUI apps---
 firefox
 okular
-kitty
+wezterm
 mpv
 feh
-;;Wireless
+;;---Wireless---
 aircrack-ng
-;;MITM
+;;---MITM---
 bettercap
-;;Recon
+;;---Recon---
 nmap
 wireshark-qt
 burpsuite
 gobuster
-;;Reverse Enegeering
+;;---Reverse Enegeering---
 ghidra
 python-uncompyle6
 ;;avaloniailspy
-;;BruteForce
+;;---BruteForce---
 hashcat
 wordlistctl
-;;Anti-obfuscation
+crunch
+hydra
+;;---Anti-obfuscation---
 perl-image-exiftool
+;;---Payloads and reverse shells---
+metasploit
+;;---Anonymity---
+proxychains-ng
+;;---Cms stuff---
+cmsfuzz
+;;EOF

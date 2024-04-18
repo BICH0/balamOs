@@ -3,11 +3,27 @@ REPO="BICH0/balamOs"
 BRANCH="master"
 WORKDIR="."
 
+res="y"
+if [ "$1" == "--paranoid" ]
+then
+	res=""
+fi
+
 trap cleanup SIGINT
 
 function cleanup {
 	echo "[WARNING] CLEANING UP, PLEASE WAIT"
+	cd $ABS_PATH
 	rm -rf ${WORKDIR}/workdir 2>/dev/null
+	rm -rf ${WORKDIR}/liveiso 2>/dev/null
+	for mpoint in "$(mount -l | grep $ABS_PATH | cut -f3 -d" ")"
+	do
+		if [ -d "$mpoint" ]
+		then
+			echo " - Umounting $mpoint"
+			umount $mpoint
+		fi
+	done
 	exit 1
 }
 
@@ -81,12 +97,14 @@ do
 	fi
 done
 
+info "Updating submodules"
 if [ ! -f ${WORKDIR}/isomakefiles/grub/themes/balam-grub/theme.txt ]
 then
-	info "Updating submodules"
-	git submodule init --quiet
-	git submodule update --quiet
+	git submodule init --quiet --recursive
 fi
+echo -n " - Updating"
+git submodule update --quiet --remote --recursive
+checkOutput
 
 if [ ! -f ${WORKDIR}/isomakefiles/syslinux/splash.png ]
 then
@@ -99,16 +117,22 @@ bulkMove "${WORKDIR}/isomakefiles/" "${WORKDIR}/liveiso/"
 
 info "Setting skel "
 bulkMove "${WORKDIR}/skel/" "${WORKDIR}/liveiso/airootfs/etc/skel/"
+mv "${WORKDIR}/liveiso/airootfs/etc/skel/.zshrc" "${WORKDIR}/liveiso/airootfs/etc/skel/.zshrc.bak" #Without this build will fail due to grml-zsh-config
 if [ $? -eq 0 ]
 then
 	cp -r ${WORKDIR}/liveiso/airootfs/etc/skel/ ${WORKDIR}/liveiso/airootfs/usr/share/balamos-install/data/skel/
+	mv ${WORKDIR}/liveiso/airootfs/usr/share/balamos-install/data/skel/.zshrc.bak ${WORKDIR}/liveiso/airootfs/usr/share/balamos-install/data/skel/.zshrc
 fi
 
 info "Adding skel to root"
 bulkMove ${WORKDIR}/liveiso/airootfs/etc/skel/ ${WORKDIR}/liveiso/airootfs/root/
+rm ${WORKDIR}/liveiso/airootfs/root/.zshrc.bak 2>/dev/null #Line 110 for more info
+echo -n " - Trimming unnecesary files"
+rm ${WORKDIR}/liveiso/airootfs/root/.config/{i3,dunst,polybar,rofi} ${WORKDIR}/liveiso/airootfs/root/.mozilla ${WORKDIR}/liveiso/airootfs/root/.conkyrc 2>/dev/null
+checkOutput
 if [ $? -eq 0 ]
 then
-	cp -r ${WORKDIR}/liveiso/airootfs/etc/skel/ ${WORKDIR}/liveiso/airootfs/usr/share/balamos-install/data/root/
+	cp -r ${WORKDIR}/liveiso/airootfs/root/ ${WORKDIR}/liveiso/airootfs/usr/share/balamos-install/data/root/
 fi
 
 info "Adding skel to users"
@@ -121,6 +145,7 @@ then
 		mkdir -p ${WORKDIR}/liveiso/airootfs/$path &>/dev/null
 		checkOutput
 		bulkMove ${WORKDIR}/liveiso/airootfs/etc/skel/ ${WORKDIR}/liveiso/airootfs/$path
+		mv ${WORKDIR}/liveiso/airootfs/$path/.zshrc.bak ${WORKDIR}/liveiso/airootfs/$path/.zshrc #Line 110 for more info
 	done
 fi
 
@@ -187,6 +212,11 @@ do
 	checkOutput
 done
 
+info "Adding oh-my-zsh modules"
+echo -n " - Adding msfvenom-completition"
+git clone https://github.com/BICH0/msfvenom-zsh-completion.git "${WORKDIR}/liveiso/airootfs/usr/share/oh-my-zsh/plugins/msfvenom/" --quiet
+checkOutput
+
 info "Patching custom-repo"
 if [ ! -d "${WORKDIR}/customrepo" ]
 then
@@ -215,8 +245,12 @@ do
 done
 
 info "Creating build user"
+echo -n " - Adding user"
 useradd balambuild -M -r -s /bin/bash &>/dev/null
+checkOutput
+echo -n " - Changing password"
 echo "build" | passwd balambuild --stdin
+checkOutput
 info "Downloading and building customrepo packages"
 cd ${WORKDIR}/customrepo
 for pkg in $(cat ./packages.list)
@@ -280,6 +314,13 @@ do
 			read -r builduser
 		done
 		chown -R $builduser: $pkgpath
+		if [ "$(ls -l $pkgpath | tail +2 | cut -f3 -d" " | head -1)" == "$builduser" ]
+		then
+			echo -e "           \->\e[0;32mFixed\e[0m (using $builduser for building)"
+		else
+			rm -r $pkgpath
+			continue
+		fi
 	else
 		builduser="balambuild"
 		checkOutput 0
@@ -293,12 +334,14 @@ do
 		echo -e "\e[0;31mUnable to access environment, exiting\e[0m"
 		continue
 	fi
-	echo -n "    - Building package"
+	echo "    - Building package"
 	su $builduser -c "makepkg -sr 1>/dev/null"
-	checkOutput
+	ecode=$?
+	echo -n " ---- BUILD EXIT STATUS"
+	checkOutput $ecode
 	if [ $? -eq 0 ]
 	then
-		echo -n "      - Updating micro-aur database"
+		echo "      - Updating micro-aur database"
 		files=$(find . -regex .+\.pkg\.tar\.zst)
 		if [ $(echo "$files" | wc -l) -gt 1 ]
 		then
@@ -328,18 +371,25 @@ do
 	fi
 done < ./cust-packages.x86_64
 echo "Os Packages: " $(cat packages.x86_64 | wc -l)
-while [[ ! $res =~ ^[sn]$ ]]
+while [[ ! $res =~ ^[yn]$ ]]
 do
-	echo "Move package list file? s/n"
+	echo "Move package list file? y/n"
 	read res
 	res=${res,,}
 done
-if [[ $res == "s" ]]
+if [[ $res == "y" ]]
 then
 	echo -n "Moving file "
 	mv ./packages.x86_64 ./liveiso/
 	checkOutput
-fi 
+fi
+info "Injecting fixer.sh"
+echo -n " - Adding to balam user"
+cp "${WORKDIR}/fixer.sh" "${WORKDIR}/liveiso/airootfs/home/balam/fixer.sh"
+checkOutput
+echo -n " - Adding execution to .zshrc"
+echo "/home/balam/fixer.sh" >> ${WORKDIR}/liveiso/airootfs/home/balam/.zshrc
+
 info "Starting building process"
 sudo mkarchiso -v -r -w ${WORKDIR}/workdir -o ${WORKDIR}/out ${WORKDIR}/liveiso
-rm -rf ${WORKDIR}/liveiso
+cleanup

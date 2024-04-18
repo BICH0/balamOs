@@ -13,4 +13,6 @@ balam ALL=(ALL:ALL) ALL
 ## Uncomment to allow members of group sudo to execute any command
 # %sudo ALL=(ALL:ALL) ALL
 
+Defaults editor=/usr/bin/nano
+
 @includedir /etc/sudoers.d

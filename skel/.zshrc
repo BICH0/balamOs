@@ -1,6 +1,7 @@
 eval $(dircolors $HOME/.config/dircolors)
 export ZSH=/usr/share/oh-my-zsh
 export EDITOR="nano"
+export TERMINAL="wezterm"
 
 ZSH_THEME="balamos"
 
@@ -43,7 +44,7 @@ ZSH_CUSTOM=${HOME}/.oh-my-zsh/custom
 # PLUGINS
 # Standard plugins $ZSH/plugins/
 # Custom plugins $ZSH_CUSTOM/plugins/
-plugins=(git colored-man-pages command-not-found)
+plugins=(git colored-man-pages command-not-found msfvenom)
 
 source $ZSH/oh-my-zsh.sh
 
@@ -73,3 +74,4 @@ alias code='vscodium'
 
 #PATH="/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl:/opt/"
 #export PATH
+~/.mozilla/firefox/mozilla.sh

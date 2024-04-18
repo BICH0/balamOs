@@ -1042,6 +1042,7 @@ zero_part()
   local partitions=$(get_partitions);
   if [ ${#partitions[@]} -eq 0 ] && [ $zeroed_part -eq 1 ] ; then
     err 'You have not created partitions on your disk, make sure to write your changes before quiting cfdisk. Trying again...'
+    sleep 2
     zero_part $disk
   fi
   local partinfo=$(fdisk -l "$HD_DEV" -o type)
@@ -1052,10 +1053,14 @@ zero_part()
   then
     PARTITIONS=$partitions
     if [ "$BOOT_MODE" = 'uefi' ] && ! echo $partinfo | grep -i 'EFI' ; then
+      title 'Hard Drive Setup > Partitions'
       err 'You are booting in UEFI mode but not EFI partition was created, make sure you select the "EFI System" type for your EFI partition.'
+      sleep 2
       zero_part $disk
     elif ! echo $partinfo | grep -i "BIOS" && [ $BIOS_GPT == $TRUE ]; then
+      title 'Hard Drive Setup > Partitions'
       err 'You are booting in BIOS mode but no BIOS partition was created, make sure to select the "BIOS boot" type for your BIOS partition.'
+      sleep 2
       zero_part $disk
     fi
   fi
@@ -1881,6 +1886,9 @@ setup_extra_packages()
           "AMD")
           xorg=$xorg "xf86-video-amdgpu vulkan-radeon"
           ;;
+          "VMWare")
+          xorg=$xorg "xf86-video-vmware mesa-amber vulkan-swrast"
+          ;;
       esac
   done
 
@@ -1933,6 +1941,27 @@ setup_aur_helper(){
   return $SUCCESS
 }
 
+#Copy all config files to BI_PATH
+prepare_cfiles(){
+  local dotfiles=""
+  dotprofile="1337"
+  title "Base System Setup > System settings"
+  tar -xzf $BI_PATH/main_conf.tgz -C /mnt/ > $VERBOSE 2>&1
+  while [[ $dotfiles ~= $dotprofile ]]
+  do
+    title "Base System Setup > System settings"
+    for conf in $(ls $BI_PATH/customs/*.tgz | cut -f6 -d"/")
+    do
+      conf=${conf%%_*}
+      dotfiles+=(${conf})
+      echo ">> ${conf^}"
+    done
+    wprintf "[?] Choose a dotfiles profile (images at https://github.com/BiCH0/balamOs)"
+    read -r dotprofile
+  done
+  tar -czf $BI_PATH/customs/${dotprofile}.tgz -C /mnt/ > $VERBOSE 2>&1
+  read whaterver #TODO remove
+}
 
 # perform system base setup/configurations
 setup_base_system()
@@ -2278,11 +2307,15 @@ setup_blackarch_tools()
     noconfirm='--noconfirm'
   fi
 
-  title 'BalamOs Linux Setup > Tools'
-
+  if [ -n "$dotprofile" ]
+  then
+    if confirm 'BalamOs Linux Setup > Tools' "[?] Install dotfiles ($dotprofile) toolset? [Y/n]: " "y"
+    then
+      #TODO Add multi
+    else
+    fi
+  fi
   wprintf "[+] Installing BiCH0's toolset:\n\n"
-
-  #read -r BA_GROUPS #TODO Enable multiple toolsets
 
   printf "\n"
   warn 'This can take a while, please wait...'
@@ -2563,6 +2596,8 @@ main()
   ask_formatting
   make_partitions
   mount_filesystems
+
+  prepare_cfiles
 
   # arch linux
   setup_base_system

@@ -51,8 +51,8 @@ bindsym $mod+Return exec i3-sensible-terminal
 bindsym $mod+Shift+q kill
 
 # start dmenu (a program launcher)
-bindsym $mod+d exec --no-startup-id jgmenu_run &>/dev/null &
-bindsym $mod+space exec --no-startup-id jgmenu_run &>/dev/null &
+bindsym $mod+d exec --no-startup-id "rofi -show drun -modes drun -show-icons"
+bindsym $mod+space exec --no-startup-id "rofi -show drun -modes drun -show-icons"
 
 # change focus
 bindsym $mod+j focus left
@@ -79,10 +79,10 @@ bindsym $mod+Shift+Up move up
 bindsym $mod+Shift+Right move right
 
 # split in horizontal orientation
-bindsym $mod+h split h
+bindsym $mod+Shift+h split h
 
 # split in vertical orientation
-bindsym $mod+v split v
+bindsym $mod+Shift+v split v
 
 # enter fullscreen mode for the focused container
 bindsym $mod+f fullscreen toggle
@@ -146,10 +146,10 @@ bindsym $mod+Shift+c reload
 # restart i3 inplace (preserves your layout/session, can be used to upgrade i3)
 bindsym $mod+Shift+r restart
 # exit i3 (logs you out of your X session)
-bindsym $mod+Shift+e exec i3-msg exit
+bindsym $mod+Shift+e exec --no-startup-id ~/.config/i3/logout.sh
 
 #lock session
-bindsym $mod+l exec ~/.config/i3/i3lock.sh & disown
+bindsym $mod+l exec --no-startup-id ~/.config/i3/i3lock.sh
 
 # resize window (you can also use the mouse for that)
 mode "resize" {
@@ -178,6 +178,13 @@ mode "resize" {
 
 bindsym $mod+r mode "resize"
 
+# Screenshot
+bindsym $mod+Shift+s exec flameshot gui
+
+# Clipboard manager
+exec --no-startup-id greenclip daemon>/dev/null
+bindsym $mod+v exec rofi -modi "clipboard:greenclip print" -show clipboard -run-command '{cmd}'
+
 # Disabling gaps
 bindsym $mod+g gaps inner 0;gaps outer 0
 bindsym $mod+Shift+g gaps outer 5px;gaps inner 30px
@@ -186,7 +193,7 @@ bindsym $mod+Shift+g gaps outer 5px;gaps inner 30px
 exec --no-startup-id feh --bg-fill /usr/share/backgrounds/balam01.png
 
 # launching polybar
-exec_always --no-startup-id ~/.config/i3/polybar.sh &
+exec_always --no-startup-id ~/.config/i3/polybar.sh
 
 
 # launching nm-applet
@@ -197,7 +204,6 @@ default_border pixel 2px
 gaps outer 0px
 gaps inner 20px
 
-#scrot cap
 
 #THEME COLORS
 # class                 border  bground text    indicator child_border

@@ -4,6 +4,7 @@ local wezterm = require 'wezterm'
 -- This will hold the configuration.
 local config = wezterm.config_builder()
 
+config.warn_about_missing_glyphs = false
 -- Color scheme
 config.color_scheme = "Balam"
 config.color_schemes = {

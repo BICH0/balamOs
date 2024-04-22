@@ -104,7 +104,6 @@ then
 fi
 echo -n " - Updating"
 git submodule update --quiet --remote --recursive
-git pull --recurse-submodules --quiet
 checkOutput
 
 if [ ! -f ${WORKDIR}/isomakefiles/syslinux/splash.png ]

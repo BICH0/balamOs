@@ -86,7 +86,7 @@ flameshot
 ;;---GUI apps---
 firefox
 okular
-wezterm
+alacritty
 mpv
 feh
 ;;---Wireless---

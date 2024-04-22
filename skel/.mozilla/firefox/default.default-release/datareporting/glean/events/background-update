@@ -1,0 +1,8 @@
+{"timestamp":60847,"category":"nimbus_events","name":"enrollment","extra":{"experiment_type":"rollout","branch":"control","experiment":"add-an-image-to-pdf-with-alt-text-rollout"}}
+{"timestamp":60866,"category":"nimbus_events","name":"enrollment","extra":{"experiment_type":"rollout","branch":"enable-csv-import","experiment":"csv-import-release-rollout"}}
+{"timestamp":60873,"category":"nimbus_events","name":"enrollment","extra":{"experiment":"ech-roll-out","branch":"rollout","experiment_type":"rollout"}}
+{"timestamp":60881,"category":"nimbus_events","name":"enrollment","extra":{"experiment":"mozillaaccounts-toolbar-button-default-visibility-existing-user","experiment_type":"rollout","branch":"treatment-a"}}
+{"timestamp":60910,"category":"nimbus_events","name":"enrollment","extra":{"experiment_type":"rollout","branch":"treatment","experiment":"upgrade-spotlight-rollout"}}
+{"timestamp":60946,"category":"nimbus_events","name":"enrollment","extra":{"experiment":"firefox-desktop-long-term-holdback-validation-release","branch":"delivery","experiment_type":"nimbus"}}
+{"timestamp":60963,"category":"nimbus_events","name":"enrollment","extra":{"branch":"rollout","experiment":"phc-rollout","experiment_type":"rollout"}}
+{"timestamp":60982,"category":"nimbus_events","name":"enrollment","extra":{"experiment":"pocket-newtab-3rd-sponsored-tile-rollout","branch":"control","experiment_type":"rollout"}}

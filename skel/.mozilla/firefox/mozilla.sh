@@ -1,5 +1,6 @@
 #!/bin/bash
 firefox &>/dev/null &
+sleep 2
 kill -15 $!
 if [ ! -f ~/.mozilla/firefox/profiles.ini ]
 then

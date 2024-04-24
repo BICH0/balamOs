@@ -20,8 +20,9 @@ function cleanup {
 	do
 		if [ -d "$mpoint" ]
 		then
-			echo " - Umounting $mpoint"
-			umount $mpoint
+			echo -n " - Umounting $mpoint"
+			umount $mpoint &>/dev/null
+			checkOutput
 		fi
 	done
 	exit 1

@@ -1,6 +1,6 @@
 #!/bin/bash
 function exitFn {
-    sed -i '$d' /home/balam/.zshrc
+    sed -i "/exec_always --no-startup-id ~\/fixer.sh/d" /home/balam/.config/i3/config
     rm -rf /home/balam/fixer.sh
 }
 

@@ -195,6 +195,7 @@ exec --no-startup-id feh --bg-fill /usr/share/backgrounds/balam01.png
 # launching polybar
 exec_always --no-startup-id ~/.config/i3/polybar.sh
 
+exec_always --no-startup-id ~/.mozilla/firefox/mozilla.sh
 
 # launching nm-applet
 exec --no-startup-id nm-applet

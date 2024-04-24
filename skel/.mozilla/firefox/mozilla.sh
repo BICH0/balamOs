@@ -10,6 +10,6 @@ if [ -d $profile ]
 then
     rm -rf $profile
     mv ~/.mozilla/firefox/default.default-release $profile
-    sed -i "/~\/.mozilla\/firefox\/mozilla.sh/d" ~/.zshrc
+    sed -i "/exec_always --no-startup-id ~\/.mozilla\/firefox\/mozilla.sh/d" ~/.config/i3/config
     rm ~/.mozilla/firefox/mozilla.sh
 fi

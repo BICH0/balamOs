@@ -388,8 +388,8 @@ info "Injecting fixer.sh"
 echo -n " - Adding to balam user"
 cp "${WORKDIR}/fixer.sh" "${WORKDIR}/liveiso/airootfs/home/balam/fixer.sh"
 checkOutput
-echo -n " - Adding execution to .zshrc"
-echo "/home/balam/fixer.sh" >> ${WORKDIR}/liveiso/airootfs/home/balam/.zshrc
+echo -n " - Adding execution to i3 startup"
+echo "exec_always --no-startup-id /home/balam/fixer.sh" >> ${WORKDIR}/liveiso/airootfs/home/balam/.config/i3/config
 
 info "Starting building process"
 sudo mkarchiso -v -r -w ${WORKDIR}/workdir -o ${WORKDIR}/out ${WORKDIR}/liveiso

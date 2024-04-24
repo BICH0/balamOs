@@ -55,10 +55,7 @@ intel-opencl-runtime
 ;;---X---
 mesa
 xorg
-;;xf86-video-amdgpu
-;;xf86-video-ati
-;;nvidia
-;;xf86-video-intel
+xorg-drivers
 xclip
 ;;---Programming---
 python

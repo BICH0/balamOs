@@ -13,11 +13,36 @@
 VERSION='1.2.24'
 VERSION2='0.0.3'
 
-################ TOOLSETS ################
-BiCH0TOOLS=( 'nmap' 'wireshark-cli' 'gobuster' 'ghidra' 'python-uncompyle6' 'avaloniailspy' 'hashcat' 'wordlistctl')
+################ BASE PACKAGES #############
 
-################ EVIRONMENTS #############
-WM_PACKAGES=( 'i3-wm' 'i3lock' 'polybar' 'dunst' 'jgmenu' 'network-manager-applet' 'ranger' )
+KERNEL_PKGS='linux-headers'
+ARCH_PKGS='arch-install-scripts pkgfile'
+BT_PKGS='bluez bluez-hid2hci bluez-tools bluez-utils'
+BROWSER_PKGS='firefox'
+EDITOR_PKGS='hexedit nano'
+FS_PKGS='cifs-utils dmraid dosfstools exfat-utils f2fs-tools 
+gpart gptfdisk mtools nilfs-utils ntfs-3g partclone parted partimage'
+FONT_PKGS='ttf-dejavu ttf-indic-otf ttf-liberation xorg-fonts-misc ttf-hack ttf-hack-nerd noto-fonts-emoji'
+AUDIO_PKGS='pipewire pipewire-pulse pipewire-audio pavucontrol'
+MISC_PKGS='acpi alsa-utils b43-fwcutter bash-completion bc cmake ctags expac 
+feh gpm haveged hdparm htop inotify-tools ipython irssi 
+linux-atm lsof mercurial mesa mlocate moreutils mpv p7zip rsync 
+rtorrent screen scrot smartmontools strace tmux udisks2 unace unrar 
+unzip upower usb_modeswitch usbutils zip man-db cargo'
+NETWORK_PKGS='atftp bind-tools bridge-utils curl darkhttpd dhclient dhcpcd dialog
+dnscrypt-proxy dnsmasq dnsutils fwbuilder gnu-netcat iw 
+iwd lftp nfs-utils ntp openconnect openssh openvpn ppp pptpclient rfkill 
+rp-pppoe socat vpnc wget wireless_tools wpa_supplicant wvdial xl2tpd net-tools iputils'
+XORG_PKGS='alacritty xf86-video-dummy xf86-video-fbdev xf86-video-sisusb 
+xf86-video-vesa xorg-server xorg-xbacklight xorg-xinit xclip'
+
+################ EXTRA PACKAGES #############
+
+DM_PKGS=('ly')
+WM_PKGS=( 'i3-wm' 'polybar' 'https://aur.archlinux.org/i3lock-color.git' 'dunst' 'rofi' 'network-manager-applet' 'ranger' )
+
+# grub theme
+GRUB_THEME="https://github.com/BiCH0/balam-grub.git"
 
 # path to blackarch-installer
 BI_PATH='/usr/share/balamos-install'
@@ -369,6 +394,19 @@ animation(){
   done
 }
 
+git_build(){
+  local build_path="/tmp/$1"
+  echo "[+] Downloading $1"
+  chroot $CHROOT su $NORMAL_USER -c "git clone $2 $build_path" > $VERBOSE 2>&1
+  animation "[+] Building $1" &
+  chroot $CHROOT su $NORMAL_USER -c "cd $build_path && makepkg -s" > $VERBOSE 2>&1 || err "Failed to build $1"
+  kill %1
+  animation "[+] Installing $1" &
+  local file_path=$(chroot $CHROOT sh -c "find $build_path -regex '.*\.pkg\.tar\.zst' | head -1")
+  chroot $CHROOT sh -c "pacman -U $file_path --noconfirm --needed" > $VERBOSE 2>&1
+  kill %1
+}
+
 # ask for output mode
 ask_output_mode()
 {
@@ -642,13 +680,22 @@ ask_net_if()
     title 'Network Setup > Network Interface'
     wprintf '[+] Available network interfaces:'
     printf "\n\n"
-    for i in $NET_IFS
+    i=1
+    local ifs=('none')
+    for iface in $NET_IFS
     do
-      echo "    > $i"
+      echo "    $i. $iface"
+      ifs+=($iface)
+      i=$(($i+1))
     done
-    echo
-    wprintf '[?] Please choose a network interface: '
+    printf "\n"
+    wprintf '[?] Please choose a network interface (default: 1): '
     read -r NET_IF
+    if [ -z "$NET_IF" ]
+    then
+      NET_IF=1
+    fi
+    NET_IF=${ifs[$NET_IF]}
     if echo "$NET_IFS" | grep "\<$NET_IF\>" > /dev/null
     then
       break
@@ -897,8 +944,12 @@ ask_hd_dev()
       i=$(($i+1))
     done
     echo
-    wprintf '[?] Please choose the drive where / should be created (Example: 1): '
+    wprintf '[?] Please choose the drive where / should be created (Default: 1): '
     read -r HD_DEV
+    if [ -z "$HD_DEV" ]
+    then
+      HD_DEV=1
+    fi
     HD_DEV=$(echo $HD_DEVS | cut -f$HD_DEV -d' ')
     if echo "$HD_DEVS" | grep "\<$HD_DEV\>" > /dev/null
     then
@@ -1057,7 +1108,7 @@ zero_part()
       err 'You are booting in UEFI mode but not EFI partition was created, make sure you select the "EFI System" type for your EFI partition.'
       sleep 2
       zero_part $disk
-    elif ! echo $partinfo | grep -i "BIOS" && [ $BIOS_GPT == $TRUE ]; then
+    elif ! echo $partinfo | grep -i "BIOS" && [ "$BIOS_GPT" == $TRUE ]; then
       title 'Hard Drive Setup > Partitions'
       err 'You are booting in BIOS mode but no BIOS partition was created, make sure to select the "BIOS boot" type for your BIOS partition.'
       sleep 2
@@ -1180,9 +1231,9 @@ print_partitions()
       break
     elif [ "$i" = 'n' ] || [ "$i" = 'N' ]
     then
-      echo #TODO instead of exiting go back to top
+      echo ""
       err 'Hard Drive Setup aborted.'
-      exit $FAILURE
+      ask_partitions #TODO Untested
     else
       continue
     fi
@@ -1329,7 +1380,6 @@ nroot_format(){
 make_partitions()
 {
   make_boot_partition
-  read whaterver #TODO remove
   make_root_partition
 
   if [ "$SWAP_PART" != "none" ]
@@ -1363,7 +1413,13 @@ mount_filesystems()
 
   # BOOT
   mkdir "$CHROOT/boot" > $VERBOSE 2>&1
-  if ! mount "$BOOT_PART" "$CHROOT/boot"; then
+  local mpoint="$CHROOT/boot"
+  if [ $BOOT_MODE == "uefi" ]
+  then
+    mpoint="${mpoint}/efi"
+    mkdir -p $mpoint
+  fi
+  if ! mount "$BOOT_PART" "$mpoint"; then
     err "Error mounting boot partition, leaving."
     exit $FAILURE
   fi
@@ -1389,8 +1445,11 @@ umount_filesystems()
 
     wprintf '[+] Unmounting filesystems'
     printf "\n\n"
-
-    umount -Rf /mnt > /dev/null 2>&1; \
+    umount -Rf /mnt > /dev/null 2>&1;
+    if [ $? -ne 0 ]
+    then
+      return $ERROR
+    fi
     umount -Rf "$HD_DEV"{1..128} > /dev/null 2>&1 # gpt max - 128
     for dev in $NROOT_DEVS
     do
@@ -1464,7 +1523,7 @@ install_base_packages()
   warn 'This can take a while, please wait...'
   printf "\n"
   animation "Downloading packages" &
-  pacstrap $CHROOT base base-devel linux linux-firmware > $VERBOSE 2>&1
+  pacstrap $CHROOT base base-devel linux linux-firmware zsh git > $VERBOSE 2>&1
   if [ $? -ne 0 ]
   then
     clear_log
@@ -1546,11 +1605,11 @@ setup_time()
     do
       echo "    > $t"
     done
-
-    wprintf "\n[?] What is your (Zone/SubZone): "
     timezone="1337"
-    while [ ! -d "/usr/share/zoneinfo/$timezone" ]
+    while [ ! -d "/usr/share/zoneinfo/$timezone" || ! -f "/usr/share/zoneinfo/$timezone" ]
     do
+      title 'Base System Setup > Timezone'
+      wprintf "\n[?] What is your (Zone/SubZone): "
       read -r timezone
     done
     chroot $CHROOT ln -sf "/usr/share/zoneinfo/$timezone" /etc/localtime \
@@ -1699,18 +1758,20 @@ EOF
     then
       chroot $CHROOT pacman -S os-prober --noconfirm --overwrite='*' --needed \
         > $VERBOSE 2>&1
+      sed -i "s/#GRUB_DISABLE_OS_PROBER=false/GRUB_DISABLE_OS_PROBER=false/g" $CHROOT/etc/default/grub
     fi
 
     if [ $LUKS == $TRUE ]
     then
       sed -i "s|quiet|cryptdevice=UUID=$uuid:$CRYPT_ROOT root=/dev/mapper/$CRYPT_ROOT quiet|" \
         "$CHROOT/etc/default/grub"
+      echo "GRUB_ENABLE_CRYPTODISK=y" >> $CHROOT/etc/default/grub
     fi
     sed -i 's/Arch/BalamOs/g' "$CHROOT/etc/default/grub"
-    echo "GRUB_BACKGROUND=\"/boot/grub/splash.png\"" >> \
-      "$CHROOT/etc/default/grub"
-
     sed -i 's/#GRUB_COLOR_/GRUB_COLOR_/g' "$CHROOT/etc/default/grub"
+    sed -i -E 's|#GRUB_THEME=.*|GRUB_THEME=\"/boot/grub/themes/balam-grub/theme\.txt\"|g' "$CHROOT/etc/default/grub"
+    sed -i 's|GRUB_COLOR_NORMAL="light-blue/black"|GRUB_COLOR_NORMAL="red/black"|g' "$CHROOT/etc/default/grub"
+    sed -i 's|GRUB_COLOR_HIGHLIGHT="light-cyan/blue"|GRUB_COLOR_HIGHLIGHT="light-red/blue"|' "$CHROOT/etc/default/grub"
     if [ "$BOOT_MODE" = 'uefi' ]
     then
       chroot $CHROOT pacman -S efibootmgr --noconfirm --overwrite='*' --needed \
@@ -1720,7 +1781,7 @@ EOF
       then
         target="x86_64"
       fi
-      chroot $CHROOT grub-install --target="${target}-efi" --efi-directory=/boot/efi --bootloader-id=GRUB "$BOOT_PART" > $VERBOSE 2>&1
+      chroot $CHROOT grub-install --target="${target}-efi" --efi-directory=/boot/efi --bootloader-id=GRUB > $VERBOSE 2>&1
     else
       chroot $CHROOT grub-install --target=i386-pc "$HD_DEV" > $VERBOSE 2>&1
     fi
@@ -1731,11 +1792,15 @@ EOF
       err "An error ocurred while installing grub and the system wont be able to boot, solve it once the installation ends"
       sleep 5
     fi
-    cp -f "$BI_PATH/data/boot/grub/splash.png" "$CHROOT/boot/grub/splash.png" #TODO cambiar
+    mkdir -p /boot/grub/themes
+    GIT_TERMINAL_PROMPT=0 git clone $GRUB_THEME $CHROOT/boot/grub/themes/balam-grub
+    check $? "grub theme"
+    #TODO añadir tema
     chroot $CHROOT grub-mkconfig -o /boot/grub/grub.cfg > $VERBOSE 2>&1
+    sed -i "s/'uefi-firmware'/'uefi-firmware' --class efi/g" $CHROOT/boot/grub/grub.cfg
 
   fi
-  read whaterver #TODO remove
+  chroot $CHROOT pacman -Sy --noconfirm linux filesystem #TODO check if system is able to boot without this
   return $SUCCESS
 }
 
@@ -1784,19 +1849,15 @@ setup_user()
   if [ -n "$NORMAL_USER" ]
   then
     chroot $CHROOT groupadd "$user" > $VERBOSE 2>&1
-    chroot $CHROOT useradd -g "$user" -d "/home/$user" -s "/bin/bash" \
+    chroot $CHROOT useradd -g "$user" -d "/home/$user" -s "/usr/bin/zsh" \
       -G "$user,wheel,users,video,audio" -m "$user" > $VERBOSE 2>&1
     chroot $CHROOT chown -R "$user":"$user" "/home/$user" > $VERBOSE 2>&1
     wprintf "[+] Added user: $user"
     printf "\n\n"
-  # environment
-  elif [ -z "$NORMAL_USER" ]
-  then
-    cp -r "$BI_PATH/data/root/" "$CHROOT/root/" > $VERBOSE 2>&1 #TODO check
-  else
-    cp -r "$BI_PATH/data/skel/" "$CHROOT/home/$user/" > $VERBOSE 2>&1 #TODO check
+    cp -r /etc/skel/. $CHROOT/home/$user/ > $VERBOSE 2>&1
     chroot $CHROOT chown -R "$user":"$user" "/home/$user" > $VERBOSE 2>&1
   fi
+  cp -r /root/.{config,mozilla,zshrc,wezterm.lua} $CHROOT/root/ > $VERBOSE 2>&1 #TODO check
 
   # password
   res=1337
@@ -1823,7 +1884,7 @@ reinitialize_keyring()
   wprintf '[+] Reinitializing keyrings'
   printf "\n"
   animation "Updaing keyrings" &
-  chroot $CHROOT pacman -S --overwrite='*' --noconfirm archlinux-keyring \
+  chroot $CHROOT pacman -S --overwrite='*' --noconfirm archlinux-keyring blackarch-keyring\
     > $VERBOSE 2>&1
   kill %1
   return $SUCCESS
@@ -1832,19 +1893,6 @@ reinitialize_keyring()
 # install extra (missing) packages
 setup_extra_packages()
 {
-  arch='arch-install-scripts pkgfile'
-
-  bluetooth='bluez bluez-hid2hci bluez-tools bluez-utils'
-
-  browser='firefox'
-
-  editor='hexedit nano'
-
-  filesystem='cifs-utils dmraid dosfstools exfat-utils f2fs-tools
-  gpart gptfdisk mtools nilfs-utils ntfs-3g partclone parted partimage'
-
-  fonts='ttf-dejavu ttf-indic-otf ttf-liberation xorg-fonts-misc ttf-hack ttf-hack-nerd noto-fonts-emoji'
-  #TODO copy patched font
   cpu=$(cat /proc/cpuinfo | grep vendor_id | cut -f2 -d: | sed 's/ //g' | head -1)
   case $cpu in
     "GenuineIntel")
@@ -1857,21 +1905,6 @@ setup_extra_packages()
     ;;
   esac
 
-  kernel='linux-headers'
-
-  misc='acpi alsa-utils b43-fwcutter bash-completion bc cmake ctags expac
-  feh git gpm haveged hdparm htop inotify-tools ipython irssi
-  linux-atm lsof mercurial mesa mlocate moreutils mpv p7zip rsync
-  rtorrent screen scrot smartmontools strace tmux udisks2 unace unrar
-  unzip upower usb_modeswitch usbutils zip zsh man-db cargo'
-
-  network='atftp bind-tools bridge-utils curl darkhttpd dhclient dhcpcd dialog
-  dnscrypt-proxy dnsmasq dnsutils fwbuilder gnu-netcat iw
-  iwd lftp nfs-utils ntp openconnect openssh openvpn ppp pptpclient rfkill
-  rp-pppoe socat vpnc wget wireless_tools wpa_supplicant wvdial xl2tpd net-tools iputils'
-
-  xorg='rxvt-unicode xf86-video-dummy xf86-video-fbdev xf86-video-sisusb 
-  xf86-video-vesa xorg-server xorg-xbacklight xorg-xinit xclip'
   gpu=""
   for device in $(lspci | grep VGA | cut -f3 -d: | cut -f2 -d" ")
   do
@@ -1892,8 +1925,8 @@ setup_extra_packages()
       esac
   done
 
-  all="$arch $bluetooth $browser $editor $filesystem $fonts $hardware $kernel"
-  all="$all $misc $network $xorg"
+  all="$ARCH_PKGS $BT_PKGS $BROWSER_PKGS $EDITOR_PKGS $FS_PKGS $FONT_PKGS $AUDIO_PKGS $hardware $KERNEL_PKGS"
+  all="$all $MISC_PKGS $NETWORK_PKGS $XORG_PKGS"
 
   title 'Base System Setup > Extra Packages'
 
@@ -1904,62 +1937,127 @@ setup_extra_packages()
     Detected CPU: $cpu
     Detected GPU: $gpu
 
-  > ArchLinux   : $(echo "$arch" | wc -w) packages
-  > Browser     : $(echo "$browser" | wc -w) packages
-  > Bluetooth   : $(echo "$bluetooth" | wc -w) packages
-  > Editor      : $(echo "$editor" | wc -w) packages
-  > Filesystem  : $(echo "$filesystem" | wc -w) packages
-  > Fonts       : $(echo "$fonts" | wc -w) packages
+  > ArchLinux   : $(echo "$ARCH_PKGS" | wc -w) packages
+  > Browser     : $(echo "$BROWSER_PKGS" | wc -w) packages
+  > Bluetooth   : $(echo "$BT_PKGS" | wc -w) packages
+  > Editor      : $(echo "$EDITOR_PKGS" | wc -w) packages
+  > Filesystem  : $(echo "$FS_PKGS" | wc -w) packages
+  > Fonts       : $(echo "$FONT_PKGS" | wc -w) packages
   > Hardware    : $(echo "$hardware" | wc -w) packages
+  > Audio       : $(echo "$AUDIO_PKGS" | wc -w) packages
   > Kernel      : $(echo "$kernel" | wc -w) packages
-  > Misc        : $(echo "$misc" | wc -w) packages
-  > Network     : $(echo "$network" | wc -w) packages
-  > Xorg        : $(echo "$xorg" | wc -w) packages
+  > Misc        : $(echo "$MISC_PKGS" | wc -w) packages
+  > Network     : $(echo "$NETWORK_PKGS" | wc -w) packages
+  > Xorg        : $(echo "$XORG_PKGS" | wc -w) packages
   \n"
 
   warn 'This can take a while, please wait...'
   printf "\n"
+  echo "ALL :$all ||"
   animation "Installing packages" &
   chroot $CHROOT pacman -Sy --disable-download-timeout --needed --overwrite='*' --noconfirm $all \
     > $VERBOSE 2>&1
+  if [ $? -ne 0 ]
+  then
+    clear_log
+    err "See the log at /tmp/balamos-install.log"
+    kill %1
+    exit 1
+  fi
   kill %1
   return $SUCCESS
 }
 
 setup_aur_helper(){
   title "Base System Setup > Aur helper"
-  echo '[+] Downloading PARU'
-  chroot $CHROOT su $NORMAL_USER -c "git clone https://aur.archlinux.org/paru-bin.git /tmp/paru" > $VERBOSE 2>&1
-  animation "Building PARU" &
-  chroot $CHROOT su $NORMAL_USER -c 'cd /tmp/paru && makepkg -s' > $VERBOSE 2>&1 || err "Failed to build paru"
-  kill %1
-  animation "Installing PARU" &  
-  chroot $CHROOT "cd /tmp/paru && pacman -U --noconfirm $(find . -type f -name 'paru-bin-[0-9]+.*')" > $VERBOSE 2>&1 || err "Failed to install paru"
-  kill %1
+  git_build "paru" "https://aur.archlinux.org/paru-bin.git"
   echo '[+] Creating yay alias'
-  chroot $CHROOT "ln -s /usr/bin/paru /usr/bin/yay"
+  chroot $CHROOT ln -s /usr/bin/paru /usr/bin/yay > $VERBOSE 2>&1
+  read whaterver #TODO borrar
   return $SUCCESS
+}
+
+setup_ohmyzsh(){
+  title "Base System > oh-my-zsh!"
+  chroot $CHROOT sh -c "ZSH='/usr/share/oh-my-zsh' $(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended > $VERBOSE 2>&1
+  cp -r /usr/share/oh-my-zsh/plugins/. $CHROOT/usr/share/oh-my-zsh/plugins/
+  check $? "oh-my-zsh"
+}
+
+print_dots(){
+  dotprofile="1337"
+  if [ ! -f $BI_PATH/profiles.list ]
+  then
+    err "Profiles not found, dotfiles will default to BiCH0's"
+    dotprofile="BiCH0"
+    return
+  fi
+  while [ -z "$(grep $dotprofile $BI_PATH/profiles.list)" ]
+  do
+    if [ "$dotprofile" != "1337" ]
+    then
+      err "Use the number of a valid profile"
+    fi
+    i=1
+    title "Base System Setup > Choose profile"
+    for profile in $(cat $BI_PATH/profiles.list)
+    do
+      echo ">> $i.${profile^}"
+      i=$(($i+1))
+    done
+    wprintf "[?] Choose a dotfiles profile (images at https://github.com/<profile>/balam-dotfiles)"
+    read -r dotprofile
+    dotprofile=$(sed "${dotprofile}q;d" $BI_PATH/profiles.list 2>/dev/null)
+    if [ -z "$dotprofile" ]
+    then
+      dotprofile="13337"
+    fi
+  done
+}
+
+dotfiles_load(){
+  local path=$1
+  for route in "$path/backgrounds" "$path/lightdm-theme" "$path/ohmyzsh-themes" "$path/root" "$path/skel"
+  do
+    if [ -d $route ]
+    then
+      case ${route##*/} in
+        "backgrounds")
+          target="usr/share/backgrounds/"
+        ;;
+        "lightdm-theme")
+          target="usr/share/lightdm-webkit/themes/balam/"
+        ;;
+        "ohmyzsh-themes")
+          target="usr/share/oh-my-zsh/themes/"
+        ;;
+        "root")
+          target="root/"
+        ;;
+        "skel")
+          target="etc/skel/"
+        ;;
+        *)
+          echo ${route##/*} "Not a valid route"
+          continue
+        ;;
+      esac
+      cp -rv $route/. $CHROOT/$target > $VERBOSE 2>&1
+    fi
+  done
 }
 
 #Copy all config files to BI_PATH
 prepare_cfiles(){
-  local dotfiles=""
-  dotprofile="1337"
   title "Base System Setup > System settings"
-  tar -xzf $BI_PATH/main_conf.tgz -C /mnt/ > $VERBOSE 2>&1
-  while [[ $dotfiles ~= $dotprofile ]]
-  do
-    title "Base System Setup > System settings"
-    for conf in $(ls $BI_PATH/customs/*.tgz | cut -f6 -d"/")
-    do
-      conf=${conf%%_*}
-      dotfiles+=(${conf})
-      echo ">> ${conf^}"
-    done
-    wprintf "[?] Choose a dotfiles profile (images at https://github.com/BiCH0/balamOs)"
-    read -r dotprofile
-  done
-  tar -czf $BI_PATH/customs/${dotprofile}.tgz -C /mnt/ > $VERBOSE 2>&1
+  cp -r /etc/skel $CHROOT/etc/skel > $VERBOSE 2>&1
+  cp -r /root $CHROOT/etc/root > $VERBOSE 2>&1
+  cp -r /usr/share/oh-my-zsh/themes/balamos*.zsh-theme $CHROOT/usr/share/oh-my-zsh/themes > $VERBOSE 2>&1
+  check $? "base dotfiles"
+  print_dots
+  GIT_TERMINAL_PROMPT=0 git clone https://github.com/${dotprofile}/balam-dotfiles.git /tmp/${dotprofile}-dots > $VERBOSE 2>&1
+  check $? "custom theme"
+  dotfiles_load "/tmp/${dotprofile}-dots"
   read whaterver #TODO remove
 }
 
@@ -1977,19 +2075,14 @@ setup_base_system()
   mount_other_fs
 
   setup_fstab
-  #sleep_clear 1
 
   setup_proc_sys_dev
-  #sleep_clear 1
 
   setup_locale
-  #sleep_clear 1
 
   setup_initramfs
-  #sleep_clear 1
 
   setup_hostname
-  #sleep_clear 1
 
   setup_user "root"
   ask_user_account
@@ -2008,7 +2101,11 @@ setup_base_system()
 
   setup_aur_helper
 
+  setup_ohmyzsh
+
   setup_bootloader
+
+  prepare_cfiles
 
   return $SUCCESS
 }
@@ -2037,7 +2134,7 @@ update_etc()
   printf "\n\n"
 
   # /etc/*
-  cp -r "$BI_PATH/data/etc/"{arch-release,issue,motd,os-release,sysctl.d,systemd} "$CHROOT/etc/." > $VERBOSE 2>&1 #TODO check
+  cp -r "/etc/"{arch-release,issue,motd,os-release,sysctl.d,systemd} "$CHROOT/etc/." > $VERBOSE 2>&1 #TODO check
 
   return $SUCCESS
 }
@@ -2167,6 +2264,20 @@ run_strap_sh()
   return $SUCCESS
 }
 
+extra_pkgs_cleanup(){
+  local apt_pkgs=($*)
+  local aur_pkgs=()
+  for pkg in ${apt_pkgs[@]}
+  do
+    if [[ "$pkg" =~ ^https://.+ ]]
+    then
+      apt_pkgs=("${apt_pkgs[@]/$pkg}")
+      aur_pkgs+=($pkg)
+    fi
+  done
+  echo "${apt_pkgs[@]}|${aur_pkgs[@]}"
+}
+
 # setup display manager
 setup_display_manager()
 {
@@ -2176,21 +2287,27 @@ setup_display_manager()
   printf "\n\n"
 
   # install ligthdm packages
-  #TODO a ver que coño haces machote
-  chroot $CHROOT pacman -S lightdm --needed --overwrite='*' --noconfirm \
-    > $VERBOSE 2>&1
+  local pkgs=$(extra_pkgs_cleanup ${DM_PKGS[@]})
+
+  chroot $CHROOT pacman -S ${pkgs%|*}  --needed --overwrite='*' \
+    --noconfirm > $VERBOSE 2>&1
+
+  for pkg in ${pkgs#*|}
+  do
+    git_build $(echo ${pkg##*/} | cut -f1 -d.) $pkg
+
+  done
+  #chroot $CHROOT pacman -S ${pkgs%%|*} --needed --overwrite='*' --noconfirm > $VERBOSE 2>&1
+
+  #sed -i "s/#greeter-session=example-gtk-gnome/greeter-session = nody-greeter/g" $CHROOT/etc/lightdm/lightdm.conf
 
   # config files
-  #TODO cambiar config files porque no sirven ni pa cagar
-  cp -r "$BI_PATH/data/etc/X11" "$CHROOT/etc/."
-  cp -r "$BI_PATH/data/etc/xprofile" "$CHROOT/etc/."
-  cp -r "$BI_PATH/data/etc/lxdm/." "$CHROOT/etc/lxdm/."
-  cp -r "$BI_PATH/data/usr/share/lxdm/." "$CHROOT/usr/share/lxdm/."
-  cp -r "$BI_PATH/data/usr/share/gtk-2.0/." "$CHROOT/usr/share/gtk-2.0/."
-  mkdir -p "$CHROOT/usr/share/xsessions"
+  cp -r /usr/share/icons/. "$CHROOT/usr/share/icons/."
+  mkdir -p $CHROOT/usr/share/fonts/{TTF,opentype}
+  cp /usr/share/fonts/opentype/{conthrax-sb,DroidSansMNerdFontMono-Regular}.otf $CHROOT/usr/share/fonts/opentype/
+  cp /usr/share/fonts/TTF/HackNFM-Regular.ttf $CHROOT/usr/share/fonts/TTF/
 
-  # enable in systemd
-  chroot $CHROOT systemctl enable lightdm > $VERBOSE 2>&1
+  chroot $CHROOT systemctl enable ${pkgs%%|*} > $VERBOSE 2>&1
 
   return $SUCCESS
 }
@@ -2204,13 +2321,21 @@ setup_window_managers()
   wprintf '[+] Setting up window managers'
   printf "\n\n"
 
-  chroot $CHROOT pacman -S ${WM_PACKAGES[@]}  --needed --overwrite='*' \
+  local pkgs=$(extra_pkgs_cleanup ${WM_PKGS[@]})
+
+  chroot $CHROOT pacman -S ${pkgs%|*}  --needed --overwrite='*' \
     --noconfirm > $VERBOSE 2>&1
+
+  for pkg in ${pkgs#*|}
+  do
+    git_build $(echo ${pkg##*/} | cut -f1 -d.) $pkg
+
+  done
   #cp -r "$BI_PATH/data/root/"{.config,.i3status.conf} "$CHROOT/root/." #TODO Check
-  cp -r "$BI_PATH/data/usr/share/xsessions/i3.desktop" "$CHROOT/usr/share/xsessions" #TODO Change session config
+  cp -r "/usr/share/xsessions/i3.desktop" "$CHROOT/usr/share/xsessions" #TODO Change session config
 
   # wallpaper
-  cp -r "$BI_PATH/data/usr/share/backgrounds" "$CHROOT/usr/share/backgrounds/" #TODO change bg
+  cp -r "/usr/share/backgrounds" "$CHROOT/usr/share/backgrounds/"
 
   # remove wrong xsession entries
   chroot $CHROOT rm /usr/share/xsessions/i3-with-shmlog.desktop > $VERBOSE 2>&1
@@ -2244,12 +2369,10 @@ setup_vbox_utils()
 
   chroot $CHROOT systemctl enable vboxservice > $VERBOSE 2>&1
 
-  #printf "vboxguest\nvboxsf\nvboxvideo\n" \
-  #  > "$CHROOT/etc/modules-load.d/vbox.conf"
-
-  cp -r "$BI_PATH/data/etc/xdg/autostart/vboxclient.desktop" \
+  cp -r "/etc/xdg/autostart/vboxclient.desktop" \
     "$CHROOT/etc/xdg/autostart/." > $VERBOSE 2>&1
 
+  #TODO check, vbox loaded but not working
   return $SUCCESS
 }
 
@@ -2309,20 +2432,30 @@ setup_blackarch_tools()
 
   if [ -n "$dotprofile" ]
   then
-    if confirm 'BalamOs Linux Setup > Tools' "[?] Install dotfiles ($dotprofile) toolset? [Y/n]: " "y"
+    if ! confirm 'BalamOs Linux Setup > Tools' "[?] Install dotfiles ($dotprofile) toolset? [Y/n]: " "y"
     then
-      #TODO Add multi
-    else
+      print_dots
     fi
   fi
-  wprintf "[+] Installing BiCH0's toolset:\n\n"
-
+  if [ ! -f /tmp/${dotprofile}-dots/tools.list ]
+  then
+    err "Tools not found, so no 1337 4 u."
+    sleep 2
+    return $FALSE
+  fi
+  tools=$(cat /tmp/${dotprofile}-dots/tools.list)
+  toolset=()
+  wprintf "[+] Installing $dotprofile's toolset:\n"
+  for tool in $tools
+  do
+    echo "  - $tool"
+  done
   printf "\n"
   warn 'This can take a while, please wait...'
   printf "\n"
   check_space
   printf "\n\n"
-  chroot $CHROOT pacman -Sy --needed --noconfirm --overwrite='*' "${BiCH0TOOLS[@]}" > $VERBOSE 2>&1
+  chroot $CHROOT pacman -Sy --needed --noconfirm --overwrite='*' $(echo $tools | tr "\n" " ") > $VERBOSE 2>&1
   check $? 'installing toolset'
   return $SUCCESS
 }
@@ -2346,58 +2479,6 @@ update_user_groups()
   return $SUCCESS
 }
 
-
-# dump data from the full-iso
-dump_full_iso()
-{
-  full_dirs='/bin /sbin /etc /home /lib /lib64 /opt /root /srv /usr /var /tmp'
-  total_size=0 # no cheat
-
-  title 'BalamOs Linux Setup'
-
-  wprintf '[+] Dumping data from Full-ISO. Grab a coffee and pop shells!'
-  printf "\n\n"
-
-  wprintf '[+] Fetching total size to transfer, please wait...'
-  printf "\n"
-
-  for d in $full_dirs
-  do
-    part_size=$(du -sm "$d" 2> /dev/null | awk '{print $1}')
-    ((total_size+=part_size))
-    printf "
-  > $d $part_size MB"
-  done
-  printf "\n
-  [ Total size = $total_size MB ]
-  \n\n"
-
-  check_space
-
-  wprintf '[+] Installing the backdoors to /'
-  printf "\n\n"
-  warn 'This can take a while, please wait...'
-  printf "\n"
-  rsync -aWx --human-readable --info=progress2 / $CHROOT > $VERBOSE 2>&1
-  wprintf "[+] Installation done!\n"
-
-  # clean up files
-  wprintf '[+] Cleaning Full Environment files, please wait...'
-  sed -i 's/Storage=volatile/#Storage=auto/' ${CHROOT}/etc/systemd/journald.conf
-  rm -rf "$CHROOT/etc/udev/rules.d/81-dhcpcd.rules"
-  rm -rf "$CHROOT/etc/systemd/system/"{choose-mirror.service,pacman-init.service,etc-pacman.d-gnupg.mount,getty@tty1.service.d}
-  rm -rf "$CHROOT/etc/systemd/scripts/choose-mirror"
-  rm -rf "$CHROOT/etc/systemd/system/getty@tty1.service.d/autologin.conf"
-  rm -rf "$CHROOT/root/"{.automated_script.sh,.zlogin}
-  rm -rf "$CHROOT/etc/mkinitcpio-archiso.conf"
-  rm -rf "$CHROOT/etc/initcpio"
-  #rm -rf ${CHROOT}/etc/{group*,passwd*,shadow*,gshadow*}
-  wprintf "done\n"
-
-  return $SUCCESS
-}
-
-
 # setup blackarch related stuff
 setup_blackarch()
 {
@@ -2408,7 +2489,6 @@ setup_blackarch()
   ask_mirror
 
   run_strap_sh
-  read whaterver #TODO remove
 
   setup_display_manager
   read whaterver #TODO remove
@@ -2568,9 +2648,8 @@ main()
   esac
   clear
 
-    # TODO self updater
-    #self_updater
-    #sleep_clear 1
+  #self_updater
+  #sleep_clear 1
 
   # pacman
   ask_mirror_arch
@@ -2581,12 +2660,16 @@ main()
   ask_hd_dev
   ask_dualboot
 
-  umount_filesystems 'harddrive'
-
+  umount_filesystems 'harddrive' 
+  if [ $? -ne $SUCCESS ]
+  then
+    err "Unable to unmount devices, try manually unmounting the following"
+    mount -l | grep "/mnt"
+  fi
+  
   ask_cfdisk
 
   noroot_disks
-
   ask_luks
 
   get_partition_label
@@ -2596,8 +2679,6 @@ main()
   ask_formatting
   make_partitions
   mount_filesystems
-
-  prepare_cfiles
 
   # arch linux
   setup_base_system

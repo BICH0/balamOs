@@ -1,6 +1,6 @@
 NAME="Balam Os"
 PRETTY_NAME="Balam Os"
-ID=balamos
+ID=balam
 BUILD_ID=rolling
 ANSI_COLOR="0;31"
 HOME_URL="https://balamos.confugiradores.es/"

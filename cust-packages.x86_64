@@ -57,6 +57,11 @@ mesa
 xorg
 xorg-drivers
 xclip
+;;---Audio---
+pipewire
+pipewire-audio
+pipewire-pulse
+pavucontrol
 ;;---Programming---
 python
 python2
@@ -103,6 +108,7 @@ python-uncompyle6
 hashcat
 wordlistctl
 crunch
+john
 hydra
 ;;---Anti-obfuscation---
 perl-image-exiftool

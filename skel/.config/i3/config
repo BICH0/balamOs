@@ -220,4 +220,4 @@ client.background       #FFFFFF
 for_window [instance="copyq"] floating enable
 for_window [instance="ghidra-Ghidra" title="Ghidra Help"] floating enable
 for_window [instance="ghidra-Ghidra" title="win0"] floating enable
-
+for_window [instance="pavucontrol" title="win0"] floating enable

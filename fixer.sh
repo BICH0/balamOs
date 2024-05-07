@@ -8,5 +8,8 @@ echo "toor" | su root -c '
 mv /etc/lsb-release.bak /etc/lsb-release
 mv /etc/skel/.zshrc.bak /etc/skel/.zshrc
 cp /etc/os-release /usr/lib/os-release
+pacman -Sy
+pacman-key --init
+pacman-key --populate archlinux blackarch
 '
 exitFn

@@ -22,7 +22,7 @@ BROWSER_PKGS='firefox'
 EDITOR_PKGS='hexedit nano'
 FS_PKGS='cifs-utils dmraid dosfstools exfat-utils f2fs-tools 
 gpart gptfdisk mtools nilfs-utils ntfs-3g partclone parted partimage'
-FONT_PKGS='ttf-dejavu ttf-indic-otf ttf-liberation xorg-fonts-misc ttf-hack ttf-hack-nerd noto-fonts-emoji'
+FONT_PKGS='ttf-dejavu ttf-indic-otf ttf-liberation xorg-fonts-misc ttf-hack ttf-hack-nerd noto-fonts-emoji terminus-font'
 AUDIO_PKGS='pipewire pipewire-pulse pipewire-audio pavucontrol'
 MISC_PKGS='acpi alsa-utils b43-fwcutter bash-completion bc cmake ctags expac 
 feh gpm haveged hdparm htop inotify-tools ipython irssi 
@@ -1664,7 +1664,7 @@ setup_initramfs()
 
   sed -i 's/keyboard fsck/keyboard fsck consolefont/g' \
     "$CHROOT/etc/mkinitcpio.conf"
-  #echo 'FONT=ter-114n' >> "$CHROOT/etc/vconsole.conf" #TODO CHANGE
+  echo 'FONT=ter-114n' >> "$CHROOT/etc/vconsole.conf"
 
   if [ $LUKS == $TRUE ]
   then

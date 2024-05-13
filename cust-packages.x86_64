@@ -32,6 +32,7 @@ openvpn ;;Openvpn client
 noto-fonts-emoji
 otf-droid-nerd
 ttf-hack-nerd
+terminus-font
 ;;---AUR---
 yay
 lightdm-mini-greeter

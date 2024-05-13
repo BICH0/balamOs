@@ -74,7 +74,7 @@ fi
 mkdir ${WORKDIR}/liveiso 2>/dev/null
 mkdir -p ${WORKDIR}/liveiso/airootfs/etc/skel
 mkdir -p ${WORKDIR}/liveiso/airootfs/usr/share/balamos-install/data/
-pacman --recv-key 7D2BAF1CF37B13E2069D6956105BD0E739499BDB 1>/dev/null && pacman --lsign 7D2BAF1CF37B13E2069D6956105BD0E739499BDB 1>/dev/null 
+pacman-key --recv 7D2BAF1CF37B13E2069D6956105BD0E739499BDB 1>/dev/null && pacman-key --lsign 7D2BAF1CF37B13E2069D6956105BD0E739499BDB 1>/dev/null 
 ABS_PATH=$(cd ${WORKDIR}; pwd)
 
 info "Copying releng into liveiso"

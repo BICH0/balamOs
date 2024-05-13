@@ -64,6 +64,7 @@ pipewire-pulse
 pavucontrol
 ;;---Programming---
 python
+python-pip
 python2
 python-setuptools
 npm
@@ -112,6 +113,7 @@ john
 hydra
 ;;---Anti-obfuscation---
 perl-image-exiftool
+stegseek
 ;;---Payloads and reverse shells---
 metasploit
 ;;---Anonymity---

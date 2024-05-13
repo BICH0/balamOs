@@ -11,7 +11,7 @@
 
 # blackarch-installer version
 VERSION='1.2.24'
-VERSION2='0.0.3'
+VERSION2='1.0.0'
 
 ################ BASE PACKAGES #############
 
@@ -28,18 +28,18 @@ MISC_PKGS='acpi alsa-utils b43-fwcutter bash-completion bc cmake ctags expac
 feh gpm haveged hdparm htop inotify-tools ipython irssi 
 linux-atm lsof mercurial mesa mlocate moreutils mpv p7zip rsync 
 rtorrent screen scrot smartmontools strace tmux udisks2 unace unrar 
-unzip upower usb_modeswitch usbutils zip man-db cargo'
+unzip upower usb_modeswitch usbutils zip man-db cargo python python-pip npm'
 NETWORK_PKGS='atftp bind-tools bridge-utils curl darkhttpd dhclient dhcpcd dialog
 dnscrypt-proxy dnsmasq dnsutils fwbuilder gnu-netcat iw 
 iwd lftp nfs-utils ntp openconnect openssh openvpn ppp pptpclient rfkill 
 rp-pppoe socat vpnc wget wireless_tools wpa_supplicant wvdial xl2tpd net-tools iputils'
 XORG_PKGS='alacritty xf86-video-dummy xf86-video-fbdev xf86-video-sisusb 
-xf86-video-vesa xorg-server xorg-xbacklight xorg-xinit xclip'
+xf86-video-vesa xorg-server xorg-xbacklight xorg-xinit dex breeze-gtk'
 
 ################ EXTRA PACKAGES #############
 
 DM_PKGS=('ly')
-WM_PKGS=( 'i3-wm' 'polybar' 'https://aur.archlinux.org/i3lock-color.git' 'dunst' 'rofi' 'network-manager-applet' 'ranger' )
+WM_PKGS=( 'i3-wm' 'polybar' 'xss-lock' 'https://aur.archlinux.org/i3lock-color.git' 'dunst' 'rofi' 'https://aur.archlinux.org/rofi-greenclip.git' 'network-manager-applet' 'ranger' 'flameshot')
 
 # grub theme
 GRUB_THEME="https://github.com/BiCH0/balam-grub.git"
@@ -402,9 +402,16 @@ git_build(){
   chroot $CHROOT su $NORMAL_USER -c "cd $build_path && makepkg -s" > $VERBOSE 2>&1 || err "Failed to build $1"
   kill %1
   animation "[+] Installing $1" &
-  local file_path=$(chroot $CHROOT sh -c "find $build_path -regex '.*\.pkg\.tar\.zst' | head -1")
+  local file_path=$(chroot $CHROOT sh -c "find $build_path -regex '.*\.pkg\.tar\.zst' | sort | head -1")
   chroot $CHROOT sh -c "pacman -U $file_path --noconfirm --needed" > $VERBOSE 2>&1
   kill %1
+}
+
+print_pkgs(){
+  for pkg in $*
+  do
+    echo "- $pkg"
+  done
 }
 
 # ask for output mode
@@ -1268,7 +1275,7 @@ make_luks_partition()
   wprintf '[+] Creating LUKS partition'
   printf "\n\n"
 
-  cryptsetup -q -y -v luksFormat "$part" \
+  cryptsetup -q -y -v --type luks2 luksFormat "$part" \
     > $VERBOSE 2>&1 || { err 'Could not LUKS format, trying again.'; make_luks_partition "$@"; }
 
 }
@@ -1312,7 +1319,7 @@ make_root_partition()
     title 'Hard Drive Setup > Partition Creation (root crypto)'
     wprintf '[+] Creating encrypted ROOT partition'
     printf "\n\n"
-    if [ "$ROOT_FS_TYPE" = 'btrfs' ]
+    if [ "$ROOT_FS_TYPE" == 'btrfs' ]
     then
       mkfs.$ROOT_FS_TYPE -f "/dev/mapper/$CRYPT_ROOT" > $VERBOSE 2>&1 ||
         { err 'Could not create filesystem'; exit $FAILURE; }
@@ -1324,7 +1331,7 @@ make_root_partition()
     title 'Hard Drive Setup > Partition Creation (root)'
     wprintf '[+] Creating ROOT partition'
     printf "\n\n"
-    if [ "$ROOT_FS_TYPE" = 'btrfs' ]
+    if [ "$ROOT_FS_TYPE" == 'btrfs' ]
     then
       mkfs.$ROOT_FS_TYPE -f "$ROOT_PART" > $VERBOSE 2>&1 ||
         { err 'Could not create filesystem'; exit $FAILURE; }
@@ -1414,11 +1421,11 @@ mount_filesystems()
   # BOOT
   mkdir "$CHROOT/boot" > $VERBOSE 2>&1
   local mpoint="$CHROOT/boot"
-  if [ $BOOT_MODE == "uefi" ]
-  then
-    mpoint="${mpoint}/efi"
-    mkdir -p $mpoint
-  fi
+  # if [ $BOOT_MODE == "uefi" ]
+  # then
+  #   mpoint="${mpoint}/efi"
+  #   mkdir -p $mpoint
+  # fi
   if ! mount "$BOOT_PART" "$mpoint"; then
     err "Error mounting boot partition, leaving."
     exit $FAILURE
@@ -1655,15 +1662,6 @@ setup_initramfs()
   wprintf '[+] Setting up InitramFS'
   printf "\n\n"
 
-  cp -f "$BI_PATH/data/etc/mkinitcpio.conf" "$CHROOT/etc/mkinitcpio.conf" #TODO check
-  cp -fr "$BI_PATH/data/etc/mkinitcpio.d" "$CHROOT/etc/"
-
-  if [ "$INSTALL_MODE" == "$INSTALL_FULL_ISO" ]
-  then
-    cp /run/archiso/bootmnt/arch/boot/x86_64/vmlinuz-linux \
-      "$CHROOT/boot/vmlinuz-linux" #TODO check
-  fi
-
   sed -i 's/keyboard fsck/keyboard fsck consolefont/g' \
     "$CHROOT/etc/mkinitcpio.conf"
   #echo 'FONT=ter-114n' >> "$CHROOT/etc/vconsole.conf" #TODO CHANGE
@@ -1781,7 +1779,7 @@ EOF
       then
         target="x86_64"
       fi
-      chroot $CHROOT grub-install --target="${target}-efi" --efi-directory=/boot/efi --bootloader-id=GRUB > $VERBOSE 2>&1
+      chroot $CHROOT grub-install --target="${target}-efi" --efi-directory=/boot/ --bootloader-id=GRUB > $VERBOSE 2>&1
     else
       chroot $CHROOT grub-install --target=i386-pc "$HD_DEV" > $VERBOSE 2>&1
     fi
@@ -1795,7 +1793,7 @@ EOF
     mkdir -p /boot/grub/themes
     GIT_TERMINAL_PROMPT=0 git clone $GRUB_THEME $CHROOT/boot/grub/themes/balam-grub
     check $? "grub theme"
-    #TODO añadir tema
+
     chroot $CHROOT grub-mkconfig -o /boot/grub/grub.cfg > $VERBOSE 2>&1
     sed -i "s/'uefi-firmware'/'uefi-firmware' --class efi/g" $CHROOT/boot/grub/grub.cfg
 
@@ -1840,13 +1838,16 @@ setup_user()
   user="$(echo "$1" | tr -dc '[:alnum:]_' | tr '[:upper:]' '[:lower:]' |
     cut -c 1-32)"
 
-  title 'Base System Setup > User'
+  title 'Base System Setup s> User'
 
   wprintf "[+] Setting up $user account"
   printf "\n\n"
 
   # normal user
-  if [ -n "$NORMAL_USER" ]
+  if [ $1 == "root" ]
+  then
+    chroot $CHROOT chsh -s /usr/bin/zsh > $VERBOSE 2>&1
+  elif [ -n "$NORMAL_USER" ]
   then
     chroot $CHROOT groupadd "$user" > $VERBOSE 2>&1
     chroot $CHROOT useradd -g "$user" -d "/home/$user" -s "/usr/bin/zsh" \
@@ -1854,10 +1855,7 @@ setup_user()
     chroot $CHROOT chown -R "$user":"$user" "/home/$user" > $VERBOSE 2>&1
     wprintf "[+] Added user: $user"
     printf "\n\n"
-    cp -r /etc/skel/. $CHROOT/home/$user/ > $VERBOSE 2>&1
-    chroot $CHROOT chown -R "$user":"$user" "/home/$user" > $VERBOSE 2>&1
   fi
-  cp -r /root/.{config,mozilla,zshrc,wezterm.lua} $CHROOT/root/ > $VERBOSE 2>&1 #TODO check
 
   # password
   res=1337
@@ -1973,7 +1971,6 @@ setup_aur_helper(){
   git_build "paru" "https://aur.archlinux.org/paru-bin.git"
   echo '[+] Creating yay alias'
   chroot $CHROOT ln -s /usr/bin/paru /usr/bin/yay > $VERBOSE 2>&1
-  read whaterver #TODO borrar
   return $SUCCESS
 }
 
@@ -2015,8 +2012,26 @@ print_dots(){
   done
 }
 
+pkgs_load(){
+  local name=$1
+  local file=$2
+  local -n array="$name"
+  local res=()
+  for item in $(grep $1 $file | cut -f1 -d"=")
+  do
+    res+=($item)
+  done
+  if [ ${#res[@]} -eq 0 ]
+  then
+    echo ${array[@]}
+  else
+    echo ${res[@]}
+  fi
+}
+
 dotfiles_load(){
   local path=$1
+  local target=""
   for route in "$path/backgrounds" "$path/lightdm-theme" "$path/ohmyzsh-themes" "$path/root" "$path/skel"
   do
     if [ -d $route ]
@@ -2042,21 +2057,44 @@ dotfiles_load(){
           continue
         ;;
       esac
-      cp -rv $route/. $CHROOT/$target > $VERBOSE 2>&1
+      cp -r $route/. $CHROOT/$target > $VERBOSE 2>&1
+    elif [ -f "$route" ]
+    then
+      case ${route##*/} in
+        "ly.conf")
+          target="/etc/ly/config.ini"
+        ;;
+      esac
     fi
   done
+  if [ -f $path/packages.list ]
+  then
+    WM_PKGS=($(pkgs_load "WM_PKGS" $path/packages.list))
+    DM_PKGS=($(pkgs_load "DM_PKGS" $path/packages.list))
+  fi
 }
 
-#Copy all config files to BI_PATH
+
+skel_push(){
+  if [ -n "$NORMAL_USER" ]
+  then
+    cp -r ${CHROOT}/etc/skel/. $CHROOT/home/$NORMAL_USER/ > $VERBOSE 2>&1
+    chroot $CHROOT chown -R "$NORMAL_USER":"$NORMAL_USER" "/home/$NORMAL_USER" > $VERBOSE 2>&1
+
+  fi
+}
+
+#Copy all dotfiles to its destination
 prepare_cfiles(){
   title "Base System Setup > System settings"
   cp -r /etc/skel $CHROOT/etc/skel > $VERBOSE 2>&1
-  cp -r /root $CHROOT/etc/root > $VERBOSE 2>&1
   cp -r /usr/share/oh-my-zsh/themes/balamos*.zsh-theme $CHROOT/usr/share/oh-my-zsh/themes > $VERBOSE 2>&1
+
   check $? "base dotfiles"
   print_dots
   GIT_TERMINAL_PROMPT=0 git clone https://github.com/${dotprofile}/balam-dotfiles.git /tmp/${dotprofile}-dots > $VERBOSE 2>&1
   check $? "custom theme"
+
   dotfiles_load "/tmp/${dotprofile}-dots"
   read whaterver #TODO remove
 }
@@ -2107,6 +2145,8 @@ setup_base_system()
 
   prepare_cfiles
 
+  skel_push
+
   return $SUCCESS
 }
 
@@ -2134,7 +2174,10 @@ update_etc()
   printf "\n\n"
 
   # /etc/*
-  cp -r "/etc/"{arch-release,issue,motd,os-release,sysctl.d,systemd} "$CHROOT/etc/." > $VERBOSE 2>&1 #TODO check
+  cp -r "/etc/"{arch-release,issue,motd,os-release,sysctl.d,systemd,lsb-release} "$CHROOT/etc/." > $VERBOSE 2>&1
+
+  # /usr/lib/lsb-release
+  cp "/usr/lib/lsb-release" "$CHROOT/usr/lib/" > $VERBOSE 2>&1
 
   return $SUCCESS
 }
@@ -2255,11 +2298,17 @@ run_strap_sh()
   then
     printf '[blackarch]\nServer = %s\nInclude = /etc/pacman.d/blackarch-mirrorlist' "$BA_REPO_URL" \
       >> "$CHROOT/etc/pacman.conf"
-    chroot $CHROOT pacman-key --lsign F9A6E68A711354D84A9B91637533BAFE69A25079
   else
     sed -i "/\[blackarch\]/{ n;s?Server.*?Server = $BA_REPO_URL?; }" \
       "$CHROOT/etc/pacman.conf"
   fi
+
+  chroot $CHROOT pacman-key --populate archlinux blackarch
+  #chroot $CHROOT pacman-key --lsign F9A6E68A711354D84A9B91637533BAFE69A25079 #TODO This should't be needed
+
+  #copy balam os updater to final system
+  cp /usr/bin/balamos-update ${CHROOT}/usr/bin/balamos-update
+  cp /usr/share/balamos_lastpatch ${CHROOT}/usr/share/balamos_lastpatch
 
   return $SUCCESS
 }
@@ -2283,7 +2332,8 @@ setup_display_manager()
 {
   title 'BalamOs Linux Setup > Display Manager'
 
-  wprintf '[+] Setting up LightDM'
+  wprintf '[+] Installing Display Manager packages:'
+  print_pkgs ${DM_PKGS[@]}
   printf "\n\n"
 
   # install ligthdm packages
@@ -2295,11 +2345,8 @@ setup_display_manager()
   for pkg in ${pkgs#*|}
   do
     git_build $(echo ${pkg##*/} | cut -f1 -d.) $pkg
-
   done
-  #chroot $CHROOT pacman -S ${pkgs%%|*} --needed --overwrite='*' --noconfirm > $VERBOSE 2>&1
-
-  #sed -i "s/#greeter-session=example-gtk-gnome/greeter-session = nody-greeter/g" $CHROOT/etc/lightdm/lightdm.conf
+  sed -i 's/--autologin root//g'  $CHROOT/etc/systemd/system/getty@tty1.service.d/autologin.conf
 
   # config files
   cp -r /usr/share/icons/. "$CHROOT/usr/share/icons/."
@@ -2309,6 +2356,19 @@ setup_display_manager()
 
   chroot $CHROOT systemctl enable ${pkgs%%|*} > $VERBOSE 2>&1
 
+  if [[ ${pkgs[@]} =~ ly ]]
+  then
+    sed -i "s|/dev/tty2|/dev/tty7|g" $CHROOT/usr/lib/systemd/system/ly.service
+  elif [[ ${pkgs[@]} =~ lightdm ]]
+  then
+      local ldmg=$(echo ${DM_PKGS[@]} | grep greeter)
+      if [ $(echo $ldmg | wc -w) -gt 1 ]
+      then
+        ldmg=$(echo $ldmg | cut -f1 -d" ")
+        warn "Multiple greeters detected, using $ldmg" 
+      fi
+      sed -i "s/#greeter-session=example-gtk-gnome/greeter-session=${ldmg}/g" $CHROOT/etc/lightdm/lightdm.conf
+  fi
   return $SUCCESS
 }
 
@@ -2318,7 +2378,8 @@ setup_window_managers()
 {
   title 'BalamOs Linux Setup > Window Managers'
 
-  wprintf '[+] Setting up window managers'
+  wprintf '[+] Installing Window Manager packages:'
+  print_pkgs ${WM_PKGS[@]}
   printf "\n\n"
 
   local pkgs=$(extra_pkgs_cleanup ${WM_PKGS[@]})
@@ -2331,8 +2392,8 @@ setup_window_managers()
     git_build $(echo ${pkg##*/} | cut -f1 -d.) $pkg
 
   done
-  #cp -r "$BI_PATH/data/root/"{.config,.i3status.conf} "$CHROOT/root/." #TODO Check
-  cp -r "/usr/share/xsessions/i3.desktop" "$CHROOT/usr/share/xsessions" #TODO Change session config
+
+  cp -r "/usr/share/xsessions/i3.desktop" "$CHROOT/usr/share/xsessions"
 
   # wallpaper
   cp -r "/usr/share/backgrounds" "$CHROOT/usr/share/backgrounds/"
@@ -2446,10 +2507,7 @@ setup_blackarch_tools()
   tools=$(cat /tmp/${dotprofile}-dots/tools.list)
   toolset=()
   wprintf "[+] Installing $dotprofile's toolset:\n"
-  for tool in $tools
-  do
-    echo "  - $tool"
-  done
+  print_pkgs $tools
   printf "\n"
   warn 'This can take a while, please wait...'
   printf "\n"
@@ -2457,6 +2515,11 @@ setup_blackarch_tools()
   printf "\n\n"
   chroot $CHROOT pacman -Sy --needed --noconfirm --overwrite='*' $(echo $tools | tr "\n" " ") > $VERBOSE 2>&1
   check $? 'installing toolset'
+  if [[ ${toolset[@]} =~ wordlistctl ]]
+  then
+    cp -r /usr/share/wordlists/ $CHROOT/usr/share/wordlists
+    chmod -R 777 $CHROOT/usr/share/wordlists
+  fi
   return $SUCCESS
 }
 
@@ -2571,27 +2634,36 @@ sync_disk()
 # check if new version available. perform self-update and exit
 self_updater()
 {
-  #TODO Change from pacman to maybe wget or smt
   title 'Self Updater'
   wprintf '[+] Checking for a new version of myself...'
   printf "\n\n"
+  local rversion=$(curl https://raw.githubusercontent.com/BICH0/balamOs/master/installer.sh 2>/dev/null | tee /tmp/installer.sh | grep VERSION2= | sed -E "s/.+=//g;s/'//g")
+  local lversion=$(echo $VERSION2 | sed -E "s/.+=//g;s/'//g")
+  local update=0
 
-  pacman -Syy > $VERBOSE 2>&1
-  repo="$(pacman -Ss blackarch-installer | head -1 | cut -d ' ' -f 2 |
-    cut -d '-' -f 1 | tr -d '.')0"
-  this="$(echo $VERSION | tr -d '.')0"
+  for ((i=1; i<=3; i++))
+  do
+    local lpart=$(echo $lversion | cut -f$i -d".")
+    local rpart=$(echo $rversion | cut -f$i -d".")
+    if [ "$lpart" -gt "$rpart" ]
+    then
+      break;
+    elif [ "$lpart" -lt "$rpart" ]
+    then
+      update=1
+      break;
+    fi
+  done
 
-  if [ "$this" -lt "$repo" ]
+  if [ "$update" -eq 1 ]
   then
     printf "\n\n"
     warn 'A new version is available! Going to fuck, err, update myself.'
-    pacman -S --overwrite='*' --noconfirm blackarch-installer > $VERBOSE 2>&1
-    yes | pacman -Scc > $VERBOSE 2>&1
+    mv /tmp/installer.sh /usr/bin/balamos-install
     wprintf "\n[+] Updated successfully. Please restart the installer now!\n"
-    chmod +x /usr/share/blackarch-installer/blackarch-install
+    chmod +x /usr/bin/balamos-install
     exit $SUCCESS
   fi
-
   return $SUCCESS
 }
 
@@ -2604,10 +2676,13 @@ main()
   check_uid
   check_env
   check_boot_mode
-  #check_iso_type
 
   # Update keyrings
   install_keyrings
+
+  # Check if installer needs to be updated
+  self_updater
+  sleep 1
 
   # output mode
   ask_output_mode
@@ -2647,9 +2722,6 @@ main()
       ;;
   esac
   clear
-
-  #self_updater
-  #sleep_clear 1
 
   # pacman
   ask_mirror_arch

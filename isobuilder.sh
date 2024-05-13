@@ -75,9 +75,10 @@ mkdir ${WORKDIR}/liveiso 2>/dev/null
 mkdir -p ${WORKDIR}/liveiso/airootfs/etc/skel
 mkdir -p ${WORKDIR}/liveiso/airootfs/usr/share/balamos-install/data/
 
+# Trust in rvm gpg keys
 gpg --keyserver keyserver.ubuntu.com --recv-keys 409B6B1796C275462A1703113804BB82D39DC0E3 7D2BAF1CF37B13E2069D6956105BD0E739499BDB 1>/dev/null
-echo 409B6B1796C275462A1703113804BB82D39DC0E3:6: | gpg --import-ownertrust # mpapis@gmail.com
-echo 7D2BAF1CF37B13E2069D6956105BD0E739499BDB:6: | gpg --import-ownertrust # piotr.kuczynski@gmail.com
+gpg --edit-key 409B6B1796C275462A1703113804BB82D39DC0E3 trust # mpapis@gmail.com
+gpg --edit-key 7D2BAF1CF37B13E2069D6956105BD0E739499BDB trust # piotr.kuczynski@gmail.com
 
 ABS_PATH=$(cd ${WORKDIR}; pwd)
 

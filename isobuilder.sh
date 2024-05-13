@@ -386,6 +386,9 @@ then
 	checkOutput
 fi
 info "Fetching wordlists"
+echo -n " - Creating wordlists directory"
+mkdir -p ${WORKDIR}/liveiso/airootfs/usr/share/wordlists/{passwords,discovery}
+checkOutput
 echo -n " - Downloading rockyou.txt.tgz"
 curl https://download.weakpass.com/wordlists/90/rockyou.txt.gz > ${WORKDIR}/liveiso/airootfs/usr/share/wordlists/passwords/rockyou.txt.gz
 checkOutput

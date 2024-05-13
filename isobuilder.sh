@@ -384,6 +384,28 @@ then
 	mv ./packages.x86_64 ./liveiso/
 	checkOutput
 fi
+info "Fetching wordlists"
+echo -n " - Downloading rockyou.txt.tgz"
+curl https://download.weakpass.com/wordlists/90/rockyou.txt.gz > ${WORKDIR}/liveiso/airootfs/usr/share/wordlists/passwords/rockyou.txt.gz
+checkOutput
+echo -n " - Downloading directory-list-2.3-big.txt"
+curl https://raw.githubusercontent.com/igorhvr/zaproxy/master/src/dirbuster/directory-list-2.3-big.txt > ${WORKDIR}/liveiso/airootfs/usr/share/wordlists/discovery/directory-list-2.3-big.txt
+checkOutput
+echo -n "   - Compressing"
+tar -I 'gzip -9' -czf ${WORKDIR}/liveiso/airootfs/usr/share/wordlists/discovery/directory-list-2.3-big.txt.tgz ${WORKDIR}/liveiso/airootfs/usr/share/wordlists/discovery/directory-list-2.3-big.txt
+checkOutput
+echo -n " - Downloading dsstorewordlist.txt"
+curl https://raw.githubusercontent.com/aels/subdirectories-discover/main/dsstorewordlist.txt > ${WORKDIR}/liveiso/airootfs/usr/share/wordlists/discovery/dsstorewordlist.txt
+checkOutput
+echo -n "   - Compressing"
+tar -I 'gzip -9' -czf ${WORKDIR}/liveiso/airootfs/usr/share/wordlists/discovery/dsstorewordlist.txt.tgz ${WORKDIR}/liveiso/airootfs/usr/share/wordlists/discovery/dsstorewordlist.txt
+echo " - Cleaning up"
+for file in $(find ${WORKDIR}/liveiso/airootfs/usr/share/wordlists/ -regex .+.txt$)
+do
+	rm $file 1>/dev/null
+done
+checkOutput 0
+
 info "Injecting fixer.sh"
 echo -n " - Adding to balam user"
 cp "${WORKDIR}/fixer.sh" "${WORKDIR}/liveiso/airootfs/home/balam/fixer.sh"

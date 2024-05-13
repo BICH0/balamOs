@@ -40,7 +40,7 @@ file_permissions=(
   ["/usr/share/wordlists"]="0:0:777"
   ["/usr/share/wordlists/discovery/"]="0:0:777"
   ["/usr/share/wordlists/passwords/"]="0:0:777"
-  ["/usr/share/wordlists/discovery/dsstorewordlist.txt"]="0:0:666"
-  ["/usr/share/wordlists/discovery/directory-list-2.3-big.tgz"]="0:0:666"
-  ["/usr/share/wordlists/passwords/rockyou.txt.tar.gz"]="0:0:666"
+  ["/usr/share/wordlists/discovery/dsstorewordlist.txt.tgz"]="0:0:666"
+  ["/usr/share/wordlists/discovery/directory-list-2.3-big.txt.tgz"]="0:0:666"
+  ["/usr/share/wordlists/passwords/rockyou.txt.gz"]="0:0:666"
 )

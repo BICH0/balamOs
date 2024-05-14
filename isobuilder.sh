@@ -1,5 +1,6 @@
 #!/bin/bash
 REPO="BICH0/balamOs"
+DOTFILES="BICH0/balam-dotfiles"
 BRANCH="master"
 WORKDIR="."
 
@@ -73,7 +74,6 @@ then
 fi
 mkdir ${WORKDIR}/liveiso 2>/dev/null
 mkdir -p ${WORKDIR}/liveiso/airootfs/etc/skel
-mkdir -p ${WORKDIR}/liveiso/airootfs/usr/share/balamos-install/data/
 
 # Trust in rvm gpg keys
 gpg --keyserver keyserver.ubuntu.com --recv-keys 409B6B1796C275462A1703113804BB82D39DC0E3 7D2BAF1CF37B13E2069D6956105BD0E739499BDB 1>/dev/null
@@ -123,24 +123,28 @@ info "Setting liveiso makefiles"
 bulkMove "${WORKDIR}/isomakefiles/" "${WORKDIR}/liveiso/"
 
 info "Setting skel "
+echo -n " - Downloading dotfiles"
+git clone https://github.com/${DOTFILES}.git ${WORKDIR}/balam-dotfiles &>/dev/null
+checkOutput
+echo -n " - Updating local dotfiles"
+cp -rf ${WORKDIR}/balam-dotfiles/skel/. ${WORKDIR}/skel/ 1>/dev/null
+checkOutput
+echo -n " - Adding skel"
 bulkMove "${WORKDIR}/skel/" "${WORKDIR}/liveiso/airootfs/etc/skel/"
+checkOutput
 mv "${WORKDIR}/liveiso/airootfs/etc/skel/.zshrc" "${WORKDIR}/liveiso/airootfs/etc/skel/.zshrc.bak" #Without this build will fail due to grml-zsh-config
-if [ $? -eq 0 ]
-then
-	cp -r ${WORKDIR}/liveiso/airootfs/etc/skel/ ${WORKDIR}/liveiso/airootfs/usr/share/balamos-install/data/skel/
-	mv ${WORKDIR}/liveiso/airootfs/usr/share/balamos-install/data/skel/.zshrc.bak ${WORKDIR}/liveiso/airootfs/usr/share/balamos-install/data/skel/.zshrc
-fi
 
 info "Adding skel to root"
+echo -n " - Updating local root dotfiles"
+cp -rf ${WORKDIR}/balam-dotfiles/root/. ${WORKDIR}/root/ 1>/dev/null
+checkOutput
+echo -n " - Adding root dotfiles"
 bulkMove ${WORKDIR}/liveiso/airootfs/etc/skel/ ${WORKDIR}/liveiso/airootfs/root/
+checkOutput
 rm ${WORKDIR}/liveiso/airootfs/root/.zshrc.bak 2>/dev/null #Line 110 for more info
 echo -n " - Trimming unnecesary files"
 rm ${WORKDIR}/liveiso/airootfs/root/.config/{i3,dunst,polybar,rofi} ${WORKDIR}/liveiso/airootfs/root/.mozilla ${WORKDIR}/liveiso/airootfs/root/.conkyrc 2>/dev/null
 checkOutput
-if [ $? -eq 0 ]
-then
-	cp -r ${WORKDIR}/liveiso/airootfs/root/ ${WORKDIR}/liveiso/airootfs/usr/share/balamos-install/data/root/
-fi
 
 info "Adding skel to users"
 users=$(grep -v "root" ${WORKDIR}/custfiles/etc/passwd 2>/dev/null | cut -f6 -d:)

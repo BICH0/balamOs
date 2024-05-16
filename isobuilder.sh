@@ -77,8 +77,8 @@ mkdir -p ${WORKDIR}/liveiso/airootfs/etc/skel
 
 # Trust in rvm gpg keys
 gpg --keyserver keyserver.ubuntu.com --recv-keys 409B6B1796C275462A1703113804BB82D39DC0E3 7D2BAF1CF37B13E2069D6956105BD0E739499BDB 1>/dev/null
-gpg --edit-key 409B6B1796C275462A1703113804BB82D39DC0E3 trust # mpapis@gmail.com
-gpg --edit-key 7D2BAF1CF37B13E2069D6956105BD0E739499BDB trust # piotr.kuczynski@gmail.com
+printf "trust\n4\nquit\n" | gpg --command-fd 0 --edit-key 409B6B1796C275462A1703113804BB82D39DC0E3 trust 1>/dev/null # mpapis@gmail.com
+printf "trust\n4\nquit\n" | gpg --command-fd 0 --edit-key 7D2BAF1CF37B13E2069D6956105BD0E739499BDB trust 1>/dev/null # piotr.kuczynski@gmail.com
 
 ABS_PATH=$(cd ${WORKDIR}; pwd)
 

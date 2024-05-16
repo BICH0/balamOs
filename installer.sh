@@ -220,7 +220,9 @@ JUST_A_COUNTER=0
 
 # Exit on CTRL + c
 clear_log(){
-  grep -v -E 'BalamOs|----|... /' ${LOGFILE}.tmp | sed -E 's/\x1B\[[0-9;]*[JKmsu]//g; s/\x1B\[[()]?[0-9;]*[^HJKmsu]//g; s/\x1B\[1m//g; s/\r//g' > ${LOGFILE}.log
+  grep -v -E 'BalamOs|----|... /' ${LOGFILE}.tmp > ${LOGFILE}2.tmp
+  mv ${LOGFILE}2.tmp ${LOGFILE}.tmp
+  sed -Ei 's/\x1B\[[0-9;]*[JKmsu]//g; s/\x1B\[[()]?[0-9;]*[^HJKmsu]//g; s/\x1B\[1m//g; s/\r//g' ${LOGFILE}.log
 }
 
 ctrl_c() {
@@ -2531,7 +2533,7 @@ run_strap_sh()
   curl -s "$BA_KEYRING.sig" > ${CHROOT}/tmp/blackarch-keyring.pkg.tar.zst.sig
 
   kill %1 2>/dev/null
-  printf "\r                          "
+  printf "\r                          \n"
 
   verify_keyring
   

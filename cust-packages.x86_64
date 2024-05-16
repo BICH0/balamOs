@@ -1,6 +1,7 @@
 ;;16/04/2024-0
 base
 linux
+linux-firmware
 mkinitcpio
 memtest86+
 memtest86+-efi

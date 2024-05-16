@@ -25,7 +25,7 @@ gpart gptfdisk mtools nilfs-utils ntfs-3g partclone parted partimage'
 FONT_PKGS='ttf-dejavu ttf-indic-otf ttf-liberation xorg-fonts-misc ttf-hack ttf-hack-nerd noto-fonts-emoji terminus-font'
 AUDIO_PKGS='pipewire pipewire-pulse pipewire-audio pavucontrol'
 MISC_PKGS='acpi alsa-utils b43-fwcutter bash-completion bc cmake ctags expac 
-feh gpm haveged hdparm htop inotify-tools ipython irssi 
+feh vlc gpm haveged hdparm htop inotify-tools ipython irssi 
 linux-atm lsof mercurial mesa mlocate moreutils mpv p7zip rsync 
 rtorrent screen scrot smartmontools strace tmux udisks2 unace unrar 
 unzip upower usb_modeswitch usbutils zip man-db cargo python python-pip npm'
@@ -40,6 +40,9 @@ xf86-video-vesa xorg-server xorg-xbacklight xorg-xinit dex breeze-gtk'
 
 DM_PKGS=('ly')
 WM_PKGS=( 'i3-wm' 'polybar' 'xss-lock' 'https://aur.archlinux.org/i3lock-color.git' 'dunst' 'rofi' 'https://aur.archlinux.org/rofi-greenclip.git' 'network-manager-applet' 'ranger' 'flameshot')
+
+# blackarch keyring version
+BA_KEYRING="https://blackarch.org/blackarch/blackarch/os/x86_64/blackarch-keyring-20180925-5-any.pkg.tar.zst"
 
 # grub theme
 GRUB_THEME="https://github.com/BiCH0/balam-grub.git"
@@ -56,7 +59,7 @@ SUCCESS=0
 FAILURE=1
 
 # verbose mode - default: quiet
-VERBOSE='/tmp/balamos-verbose'
+VERBOSE='/tmp/balamos-install_verbose.log'
 
 # colors
 WHITE="$(tput setaf 7)"
@@ -65,7 +68,7 @@ WHITE="$(tput setaf 7)"
 #BLUEB="$(tput bold ; tput setaf 4)"
 CYAN="$(tput setaf 6)"
 #CYANB="$(tput bold ; tput setaf 6)"
-# GREEN="$(tput setaf 2)"
+GREEN="$(tput setaf 2)"
 # GREENB="$(tput bold ; tput setaf 2)"
 PURPLE="$(tput setaf 13)"
 #PURPLEB="$(tput bold ; tput setaf 13)"
@@ -209,6 +212,12 @@ BIOS_GPT=''
 #log file path
 LOGFILE="/tmp/balamos-install"
 
+# confirmation messages
+CNF_MSGS=('I think you should really think about it' 'Fr fr, give it a thought' 'Im warning you brother, this is bad, not good practice' "Okay, as you wish, but i wouldn't do that" 'Nah just joking, keep trying, i have all day long' 'No, l00s3r')
+
+# just a counter
+JUST_A_COUNTER=0
+
 # Exit on CTRL + c
 clear_log(){
   grep -v -E 'BalamOs|----|... /' ${LOGFILE}.tmp | sed -E 's/\x1B\[[0-9;]*[JKmsu]//g; s/\x1B\[[()]?[0-9;]*[^HJKmsu]//g; s/\x1B\[1m//g; s/\r//g' > ${LOGFILE}.log
@@ -233,6 +242,14 @@ check()
 
   if [ "$es" -ne 0 ]
   then
+    local jobs=$(jobs | grep "\[~\]")
+    if [ -n "$jobs" ]
+    then
+      for job in $(echo "$jobs")
+      do
+        kill %$(echo $job cut -f1 -d"]" | cut -f2 -d"[") 2>/dev/null
+      done
+    fi
     echo
     warn "Something went wrong with $func. $info."
     sleep 5
@@ -304,6 +321,38 @@ check_boot_mode()
   return $SUCCESS
 }
 
+# draw a dynamic multi column menu
+menu_draw(){
+  local list=($*)
+  local count=0
+  local maxlen=0
+  local entry
+  local whitespace
+  for entry in ${list[@]}
+  do
+    if [ ${#entry} -gt $maxlen ]
+    then
+      maxlen=${#entry}
+    fi
+  done
+  local colnum=$(( $(tput cols) / $(($maxlen+5)) ))
+  for entry in ${list[@]}
+  do
+    whitespace=""
+    while [ $((${#entry} + ${#whitespace})) -lt $maxlen ]
+    do
+      whitespace=$whitespace" "
+    done
+    if [ "$count" -lt $colnum ]
+    then
+      echo -n "$entry$whitespace  "
+      ((count++))
+    else
+      echo $entry
+      count=0
+    fi
+  done
+}
 
 # confirm user inputted yYnN
 confirm()
@@ -337,8 +386,8 @@ install_keyrings()
   check $? 'installing keyring'
   if [ "$?" -ne 0 ]
   then
-    :
-    #exit 1 #TODO Remove for prod
+    err "The installer couldn't install the keyrings"
+    exit
   else
     clear
   fi
@@ -388,29 +437,134 @@ animation(){
   while true
   do
     for frame in "${animation[@]}"; do
-          printf "\r%s... %s" "$1" "$frame"
+          printf "\r[~] %s... %s" "$1" "$frame"
           sleep "$delay"
     done
   done
 }
 
+kill_job(){
+  if [ "$VERBOSE" == '/dev/stdout' ]
+  then
+    return 0
+  fi
+  local jobid=$(jobs | grep "animation \"$1" | cut -f1 -d"]" | cut -f2 -d"[")
+  if [ -n "$jobid" ]
+  then
+    local lin
+    for lin in "$jobid"
+    do
+      echo "Killing animation at %$jobid" >> $VERBOSE
+      kill %$jobid
+    done
+  fi
+  echo "Running jobs:" >> $VERBOSE
+  jobs >> $VERBOSE
+}
+
+dependency_parser(){
+  echo "[+] Parsing dependencies"
+  if [ ! -f "$1/PKGBUILD" ]
+  then
+	  return 1
+  fi
+  local line
+  local read=0
+  local dependencies=()
+  while read line
+  do
+	  case $line in
+      "depends=(")
+      ;&
+      "optdepends=(")
+      ;&
+      "makedepends=(")
+        read=1
+      ;;
+      ")")
+        read=0
+      ;;
+      *)
+        if [ "$read" -eq 1 ]
+        then
+          dependencies+=($(echo ${line%:*} | sed "s/'//g"))
+        fi
+	  esac
+  done < "$1/PKGBUILD"
+  animation "Installing dependencies" &
+  local out=$(chroot $CHROOT pacman -Sy ${dependencies[*]} --needed --noconfirm 2>&1)
+  kill_job "Installing"
+  if [ -n "$out" ]
+  then
+	  local ecode=0
+	  local rm_pkgs=()
+    for pkg in $(echo "$out" | grep "target not found" | cut -f3 -d: | sed 's/ //g;')
+    do
+      rm -rf $CHROOT/tmp/$pkg
+      git_build $pkg https://aur.archlinux.org/$pkg.git
+      if [ $? -ne 0 ]
+      then
+        ecode=$?
+      fi
+      rm_pkgs+=($pkg)
+    done
+    if [ $ecode -eq 0 ]
+    then
+      animation "Installing dependencies" &
+      dependencies=($(comm -3 <(printf "%s\n" "${rm_pkgs[@]}" | sort) <(printf "%s\n" "${dependencies[@]}" | sort) | sort -n))
+      chroot $CHROOT pacman -Sy ${dependencies[*]} --needed --noconfirm >> $VERBOSE 2>&1
+      kill_job "Installing"
+      return $?
+    fi
+  fi
+}
+
 git_build(){
   local build_path="/tmp/$1"
   echo "[+] Downloading $1"
-  chroot $CHROOT su $NORMAL_USER -c "git clone $2 $build_path" > $VERBOSE 2>&1
-  animation "[+] Building $1" &
-  chroot $CHROOT su $NORMAL_USER -c "cd $build_path && makepkg -s" > $VERBOSE 2>&1 || err "Failed to build $1"
-  kill %1
-  animation "[+] Installing $1" &
+  chroot $CHROOT su $NORMAL_USER -c "git clone $2 $build_path" >> $VERBOSE 2>&1
+  animation "Building $1" &
+  chroot $CHROOT su $NORMAL_USER -c "cd $build_path && makepkg --noconfirm" >> $VERBOSE 2>&1
+  ecode=$?
+  kill_job "Building"
+  if [ "$ecode" -ne 0 ]
+  then
+    printf "\r[~] %s [ERR]  " "Building $1"
+    if [ "$ecode" -eq 8 ]
+    then
+      printf "\n"
+      dependency_parser $CHROOT/$build_path
+      if [ $? -eq 0 ]
+      then
+        animation "Rebuilding $1" &
+        chroot $CHROOT su $NORMAL_USER -c "cd $build_path && makepkg --noconfirm" >> $VERBOSE 2>&1
+        kill_job "Rebuilding"
+      else
+        err "Failed to build $1"
+        return 1
+      fi
+    else
+      err "Failed to build $1"
+      return 1
+    fi
+  else
+    printf "\r[~] %s [OK]  " "Building $1"
+  fi
+  printf "\n"
+  animation "Installing $1" &
   local file_path=$(chroot $CHROOT sh -c "find $build_path -regex '.*\.pkg\.tar\.zst' | sort | head -1")
-  chroot $CHROOT sh -c "pacman -U $file_path --noconfirm --needed" > $VERBOSE 2>&1
-  kill %1
+  chroot $CHROOT sh -c "pacman -U $file_path --noconfirm --needed" >> $VERBOSE 2>&1
+  kill_job "Installing"
+  printf "\r[~] %s [OK]  " "Installing $1"
+  printf "\n"
+  return 0
 }
 
 print_pkgs(){
+  printf "\n"
   for pkg in $*
   do
-    echo "- $pkg"
+    echo "      - ${pkg##*/}"
   done
 }
 
@@ -451,8 +605,9 @@ ask_locale()
       break
     elif [ "$locale_opt" = "$LIST_LOCALE" ]
     then
-      tail +$(grep -nE '^#$' -m50 /etc/locale.gen | tail -1 | cut -f1 -d:) /etc/locale.gen | sed 's/\#//g' | less
+      menu_draw $(tail +$(grep -nE '^#$' -m50 /etc/locale.gen | tail -1 | cut -f1 -d:) /etc/locale.gen | sed 's/\#//g')
       echo
+      read smtg
     else
       continue
     fi
@@ -506,8 +661,9 @@ ask_keymap()
       break
     elif [ "$keymap_opt" = "$LIST_KEYMAP" ]
     then
-      localectl list-keymaps
+      menu_draw $(localectl list-keymaps)
       echo
+      read smtg
     else
       continue
     fi
@@ -539,7 +695,7 @@ set_keymap()
     set_keymap
   fi
   setxkbmap $KEYMAP 2>/dev/null
-  loadkeys "$KEYMAP" > $VERBOSE 2>&1
+  loadkeys "$KEYMAP" >> $VERBOSE 2>&1
   return $SUCCESS
 }
 
@@ -633,10 +789,10 @@ update_pkg_database()
   wprintf '[+] Updating pacman database'
   printf "\n\n"
   animation "Updating database" &
-  pacman -Syy --noconfirm > $VERBOSE 2>&1
+  pacman -Syy --noconfirm >> $VERBOSE 2>&1
   check $? "pacman database update"
   ecode=$?
-  kill %1
+  kill %1 2>/dev/null
   if [ $ecode -ne 0 ]
   then
     exit 1
@@ -693,7 +849,7 @@ ask_net_if()
     do
       echo "    $i. $iface"
       ifs+=($iface)
-      i=$(($i+1))
+      ((i++))
     done
     printf "\n"
     wprintf '[?] Please choose a network interface (default: 1): '
@@ -794,7 +950,7 @@ net_conf_auto()
   wprintf "[+] Configuring network interface '$NET_IF' via DHCP: "
   printf "\n\n"
 
-  dhcpcd "$opts" -i "$NET_IF" > $VERBOSE 2>&1
+  dhcpcd "$opts" -i "$NET_IF" >> $VERBOSE 2>&1
 
   sleep 10
 
@@ -834,13 +990,13 @@ net_conf_wlan()
   printf "\n\n"
 
   wpa_passphrase "$WLAN_SSID" "$WLAN_PASSPHRASE" > "$wpasup"
-  wpa_supplicant -B -c "$wpasup" -i "$NET_IF" > $VERBOSE 2>&1
+  wpa_supplicant -B -c "$wpasup" -i "$NET_IF" >> $VERBOSE 2>&1
 
   warn 'We need to wait a bit for wpa_supplicant and dhcpcd'
 
   sleep 10
 
-  dhcpcd "$dhcp_opts" -i "$NET_IF" > $VERBOSE 2>&1
+  dhcpcd "$dhcp_opts" -i "$NET_IF" >> $VERBOSE 2>&1
 
   sleep 10
 
@@ -854,7 +1010,7 @@ check_inet_conn()
   title 'Network Setup > Connection Check'
   wprintf '[+] Checking for Internet connection...'
 
-  if ! curl -s http://www.yahoo.com/ > $VERBOSE
+  if ! curl -s http://www.yahoo.com/ >> $VERBOSE
   then
     err 'No Internet connection! Check your network (settings).'
     exit $FAILURE
@@ -948,7 +1104,7 @@ ask_hd_dev()
       local disksize=$(echo "$diskinfo" | head -1 | awk '{gsub(",", ".", $3); sub(/,.*$/, "", $3); print $3,$4}')
       local diskmodel=$(echo "$diskinfo" | tail -1 | cut -f2 -d: | tr -s " ")
       echo "    ${i}. $dev  ${disksize::-1} (${diskmodel:1:-1})"
-      i=$(($i+1))
+      ((i++))
     done
     echo
     wprintf '[?] Please choose the drive where / should be created (Default: 1): '
@@ -978,7 +1134,7 @@ ask_hd_dev()
         for dev in $NROOT_DEVS
         do
           echo "   > $c.$dev"
-          c=$((c+1))
+          ((c++))
         done
         echo "   > 0.None"
         echo
@@ -1240,7 +1396,11 @@ print_partitions()
     then
       echo ""
       err 'Hard Drive Setup aborted.'
-      ask_partitions #TODO Untested
+      BOOT_PART=''
+      ROOT_PART=''
+      BOOT_FS_TYPE=''
+      ROOT_FS_TYPE=''
+      ask_partitions
     else
       continue
     fi
@@ -1257,8 +1417,10 @@ ask_formatting()
   then
     return $SUCCESS
   else
-    echo
-    err 'Seriously? No formatting no fun! Please format to continue or CTRL + c to cancel...'
+    echo ""
+    err 'Seriously? No formatting no fun!'
+    err 'Please format to continue or CTRL + c to cancel...'
+    sleep 2
     ask_formatting
   fi
 
@@ -1276,7 +1438,7 @@ make_luks_partition()
   printf "\n\n"
 
   cryptsetup -q -y -v --type luks2 luksFormat "$part" \
-    > $VERBOSE 2>&1 || { err 'Could not LUKS format, trying again.'; make_luks_partition "$@"; }
+    >> $VERBOSE 2>&1 || { err 'Could not LUKS format, trying again.'; make_luks_partition "$@"; }
 
 }
 
@@ -1291,7 +1453,7 @@ open_luks_partition()
 
   wprintf '[+] Opening LUKS partition'
   printf "\n\n"
-  cryptsetup open "$part" "$name" > $VERBOSE 2>&1 ||
+  cryptsetup open "$part" "$name" >> $VERBOSE 2>&1 ||
     { err 'Could not open LUKS device, please try again and make sure that your password is correct.'; open_luks_partition "$@"; }
 
 }
@@ -1304,7 +1466,7 @@ make_swap_partition()
 
   wprintf '[+] Creating SWAP partition'
   printf "\n\n"
-  mkswap $SWAP_PART > $VERBOSE 2>&1 || { err 'Could not create filesystem'; exit $FAILURE; }
+  mkswap $SWAP_PART >> $VERBOSE 2>&1 || { err 'Could not create filesystem'; exit $FAILURE; }
 
 }
 
@@ -1321,10 +1483,10 @@ make_root_partition()
     printf "\n\n"
     if [ "$ROOT_FS_TYPE" == 'btrfs' ]
     then
-      mkfs.$ROOT_FS_TYPE -f "/dev/mapper/$CRYPT_ROOT" > $VERBOSE 2>&1 ||
+      mkfs.$ROOT_FS_TYPE -f "/dev/mapper/$CRYPT_ROOT" >> $VERBOSE 2>&1 ||
         { err 'Could not create filesystem'; exit $FAILURE; }
     else
-      mkfs.$ROOT_FS_TYPE -F "/dev/mapper/$CRYPT_ROOT" > $VERBOSE 2>&1 ||
+      mkfs.$ROOT_FS_TYPE -F "/dev/mapper/$CRYPT_ROOT" >> $VERBOSE 2>&1 ||
         { err 'Could not create filesystem'; exit $FAILURE; }
     fi
   else
@@ -1333,10 +1495,10 @@ make_root_partition()
     printf "\n\n"
     if [ "$ROOT_FS_TYPE" == 'btrfs' ]
     then
-      mkfs.$ROOT_FS_TYPE -f "$ROOT_PART" > $VERBOSE 2>&1 ||
+      mkfs.$ROOT_FS_TYPE -f "$ROOT_PART" >> $VERBOSE 2>&1 ||
         { err 'Could not create filesystem'; exit $FAILURE; }
     else
-      mkfs.$ROOT_FS_TYPE -F "$ROOT_PART" > $VERBOSE 2>&1 ||
+      mkfs.$ROOT_FS_TYPE -F "$ROOT_PART" >> $VERBOSE 2>&1 ||
         { err 'Could not create filesystem'; exit $FAILURE; }
     fi
   fi
@@ -1354,12 +1516,12 @@ make_boot_partition()
   printf "\n\n"
   if [ "$BOOT_MODE" = 'uefi' ] && [ "$PART_LABEL" = 'gpt' ]
   then
-    mkfs.fat -F32 "$BOOT_PART" > $VERBOSE 2>&1 ||
+    mkfs.fat -F32 "$BOOT_PART" >> $VERBOSE 2>&1 ||
       { err 'Could not create filesystem'; exit $FAILURE; }
   else
     if [ ! $BIOS_GPT == $TRUE ]
     then
-      mkfs.$BOOT_FS_TYPE -F "$BOOT_PART" > $VERBOSE 2>&1 ||
+      mkfs.$BOOT_FS_TYPE -F "$BOOT_PART" >> $VERBOSE 2>&1 ||
       { err 'Could not create filesystem'; exit $FAILURE; }
     fi
   fi
@@ -1373,10 +1535,10 @@ nroot_format(){
   title "Hard Drive Setup > Partition Creation ($part)"
   if [ "$ROOT_FS_TYPE" = 'btrfs' ]
     then
-      mkfs.$fstype -f "$part" > $VERBOSE 2>&1 ||
+      mkfs.$fstype -f "$part" >> $VERBOSE 2>&1 ||
         { err 'Could not create filesystem'; exit $FAILURE; }
     else
-      mkfs.$fstype -F "$part" > $VERBOSE 2>&1 ||
+      mkfs.$fstype -F "$part" >> $VERBOSE 2>&1 ||
         { err 'Could not create filesystem'; exit $FAILURE; }
     fi
   return $SUCCESS
@@ -1419,7 +1581,7 @@ mount_filesystems()
   fi
 
   # BOOT
-  mkdir "$CHROOT/boot" > $VERBOSE 2>&1
+  mkdir "$CHROOT/boot" >> $VERBOSE 2>&1
   local mpoint="$CHROOT/boot"
   # if [ $BOOT_MODE == "uefi" ]
   # then
@@ -1434,7 +1596,7 @@ mount_filesystems()
   # SWAP
   if [ "$SWAP_PART" != "none" ]
   then
-    swapon $SWAP_PART > $VERBOSE 2>&1
+    swapon $SWAP_PART >> $VERBOSE 2>&1
   fi
 
   return $SUCCESS
@@ -1452,15 +1614,15 @@ umount_filesystems()
 
     wprintf '[+] Unmounting filesystems'
     printf "\n\n"
-    umount -Rf /mnt > /dev/null 2>&1;
+    umount -Rf $CHROOT > /dev/null 2>&1;
     if [ $? -ne 0 ]
     then
       return $ERROR
     fi
-    umount -Rf "$HD_DEV"{1..128} > /dev/null 2>&1 # gpt max - 128
+    umount -Rfl "$HD_DEV"{1..128} > /dev/null 2>&1 # gpt max - 128
     for dev in $NROOT_DEVS
     do
-      umount -Rf "/dev/$dev"{1..128} > /dev/null 2>&1 # gpt max - 128
+      umount -Rfl "/dev/$dev"{1..128} > /dev/null 2>&1 # gpt max - 128
     done
   else
     title 'Game Over'
@@ -1468,12 +1630,12 @@ umount_filesystems()
     wprintf '[+] Unmounting filesystems'
     printf "\n\n"
 
-    umount -Rf $CHROOT > /dev/null 2>&1
+    umount -Rfl $CHROOT > /dev/null 2>&1
     cryptsetup luksClose "$CRYPT_ROOT" > /dev/null 2>&1
     swapoff $SWAP_PART > /dev/null 2>&1
     for dev in $NROOT_DEVS
     do
-      umount -Rf "/dev/$dev"{1..128} > /dev/null 2>&1 # gpt max - 128
+      umount -Rfl "/dev/$dev"{1..128} > /dev/null 2>&1 # gpt max - 128
     done
   fi
 
@@ -1492,7 +1654,7 @@ mount_other_fs(){
       mp=${mp:1}
     fi
     echo "Mounting $part on $CHROOT/$mp"
-    mount "$part" $CHROOT/$mp > $VERBOSE 2>&1
+    mount "$part" $CHROOT/$mp >> $VERBOSE 2>&1
     if [ $? -ne 0 ]
     then
       err "Error mounting $part in $CHROOT/$mp"
@@ -1530,16 +1692,18 @@ install_base_packages()
   warn 'This can take a while, please wait...'
   printf "\n"
   animation "Downloading packages" &
-  pacstrap $CHROOT base base-devel linux linux-firmware zsh git > $VERBOSE 2>&1
+  pacstrap $CHROOT base base-devel linux linux-firmware zsh git >> $VERBOSE 2>&1
   if [ $? -ne 0 ]
   then
+    kill %1 2>/dev/null
     clear_log
+    echo ""
     err "See the log at /tmp/balamos-install.log"
     exit 1
   fi
-  chroot $CHROOT pacman -Syy --noconfirm --overwrite='*' > $VERBOSE 2>&1
+  chroot $CHROOT pacman -Syy --noconfirm --overwrite='*' >> $VERBOSE 2>&1
   check $? "install base packages"
-  kill %1
+  kill %1 2>/dev/null
   if [ $ecode -ne 0 ]
   then
     clear_log
@@ -1558,8 +1722,8 @@ setup_resolvconf()
   wprintf '[+] Setting up /etc/resolv.conf'
   printf "\n\n"
 
-  mkdir -p "$CHROOT/etc/" > $VERBOSE 2>&1
-  cp -L /etc/resolv.conf "$CHROOT/etc/resolv.conf" > $VERBOSE 2>&1
+  mkdir -p "$CHROOT/etc/" >> $VERBOSE 2>&1
+  cp -L /etc/resolv.conf "$CHROOT/etc/resolv.conf" >> $VERBOSE 2>&1
 
   return $SUCCESS
 }
@@ -1595,32 +1759,58 @@ setup_locale()
   printf "\n\n"
   sed -i "s/^#en_US.UTF-8/en_US.UTF-8/" "$CHROOT/etc/locale.gen"
   sed -i "s/^#$LOCALE/$LOCALE/" "$CHROOT/etc/locale.gen"
-  chroot $CHROOT locale-gen > $VERBOSE 2>&1
+  chroot $CHROOT locale-gen >> $VERBOSE 2>&1
   echo "LANG=$LOCALE" > "$CHROOT/etc/locale.conf"
   echo "KEYMAP=$KEYMAP" > "$CHROOT/etc/vconsole.conf"
 
   return $SUCCESS
 }
 
+get_timezones(){
+  local tzns=()
+  local zone
+  for zone in $(ls -I "*.*" /usr/share/zoneinfo/$1)
+  do
+    if [ $zone == ${zone,,} ]
+    then
+      continue
+    fi
+    tzns+=($zone)
+  done
+  echo ${tzns[@]}
+}
 
 # setup timezone
 setup_time()
 {
   if confirm 'Base System Setup > Timezone' '[?] Default: UTC. Choose other timezone [y/n]: '
   then
-    for t in $(timedatectl list-timezones)
+    local timezone="1337"
+    local timezones=($(get_timezones))
+    while [[ ! ${timezones[@]} =~ ${timezone} ]] || [ -z "$timezone" ]
     do
-      echo "    > $t"
-    done
-    timezone="1337"
-    while [ ! -d "/usr/share/zoneinfo/$timezone" || ! -f "/usr/share/zoneinfo/$timezone" ]
-    do
-      title 'Base System Setup > Timezone'
-      wprintf "\n[?] What is your (Zone/SubZone): "
+      title 'Base System Setup > Timezone > Zone'
+      menu_draw ${timezones[@]}
+      wprintf "\n[?] What is your (Zone): "
       read -r timezone
+      timezone=${timezone^}
     done
+    if [ -d "/usr/share/zoneinfo/$timezone" ]
+    then
+      local timesubzone="1337"
+      local timesubzones=($(get_timezones $timezone))
+      while [ ! -f "/usr/share/zoneinfo/$timezone/$timesubzone" ]
+      do
+        title 'Base System Setup > Timezone > Subzone'
+        menu_draw ${timesubzones[@]}
+        wprintf "\n[?] What is your (Subzone): "
+        read -r timesubzone
+        timesubzone=${timesubzone^}
+      done
+      timezone=$timezone/$timesubzone
+    fi
     chroot $CHROOT ln -sf "/usr/share/zoneinfo/$timezone" /etc/localtime \
-      > $VERBOSE 2>&1
+      >> $VERBOSE 2>&1
 
     if [ $? -eq 1 ]
     then
@@ -1648,7 +1838,7 @@ default_time()
   echo
   warn 'Setting up default time and timezone: UTC'
   printf "\n\n"
-  chroot $CHROOT ln -sf /usr/share/zoneinfo/UTC /etc/localtime > $VERBOSE 2>&1
+  chroot $CHROOT ln -sf /usr/share/zoneinfo/UTC /etc/localtime >> $VERBOSE 2>&1
 
   return $SUCCESS
 }
@@ -1674,8 +1864,9 @@ setup_initramfs()
 
   warn 'This can take a while, please wait...'
   printf "\n"
-  chroot $CHROOT mkinitcpio -P > $VERBOSE 2>&1
-
+  animation "Creating initramfs" &
+  chroot $CHROOT mkinitcpio -P >> $VERBOSE 2>&1
+  kill %1 2>/dev/null
   return $SUCCESS
 }
 
@@ -1688,13 +1879,13 @@ setup_proc_sys_dev()
   wprintf '[+] Setting up /proc, /sys and /dev'
   printf "\n\n"
 
-  mkdir -p "${CHROOT}/"{proc,sys,dev} > $VERBOSE 2>&1
+  mkdir -p "${CHROOT}/"{proc,sys,dev} >> $VERBOSE 2>&1
 
-  mount -t proc proc "$CHROOT/proc" > $VERBOSE 2>&1
-  mount --rbind /sys "$CHROOT/sys" > $VERBOSE 2>&1
-  mount --make-rslave "$CHROOT/sys" > $VERBOSE 2>&1
-  mount --rbind /dev "$CHROOT/dev" > $VERBOSE 2>&1
-  mount --make-rslave "$CHROOT/dev" > $VERBOSE 2>&1
+  mount -t proc proc "$CHROOT/proc" >> $VERBOSE 2>&1
+  mount --rbind /sys "$CHROOT/sys" >> $VERBOSE 2>&1
+  mount --make-rslave "$CHROOT/sys" >> $VERBOSE 2>&1
+  mount --rbind /dev "$CHROOT/dev" >> $VERBOSE 2>&1
+  mount --make-rslave "$CHROOT/dev" >> $VERBOSE 2>&1
 
   return $SUCCESS
 }
@@ -1724,7 +1915,7 @@ setup_bootloader()
     wprintf '[+] Setting up EFI boot loader'
     printf "\n\n"
 
-    chroot $CHROOT bootctl install > $VERBOSE 2>&1
+    chroot $CHROOT bootctl install >> $VERBOSE 2>&1
     uuid="$(blkid "$ROOT_PART" | cut -d ' ' -f 2 | cut -d '"' -f 2)"
 
     if [ $LUKS = $TRUE ]
@@ -1750,12 +1941,12 @@ EOF
     animation "Setting up grub2" &
     uuid="$(lsblk -o UUID "$ROOT_PART" | sed -n 2p)"
     chroot $CHROOT pacman -S grub --noconfirm --overwrite='*' --needed \
-        > $VERBOSE 2>&1
+        >> $VERBOSE 2>&1
 
     if [ $DUALBOOT = $TRUE ]
     then
       chroot $CHROOT pacman -S os-prober --noconfirm --overwrite='*' --needed \
-        > $VERBOSE 2>&1
+        >> $VERBOSE 2>&1
       sed -i "s/#GRUB_DISABLE_OS_PROBER=false/GRUB_DISABLE_OS_PROBER=false/g" $CHROOT/etc/default/grub
     fi
 
@@ -1765,40 +1956,46 @@ EOF
         "$CHROOT/etc/default/grub"
       echo "GRUB_ENABLE_CRYPTODISK=y" >> $CHROOT/etc/default/grub
     fi
-    sed -i 's/Arch/BalamOs/g' "$CHROOT/etc/default/grub"
-    sed -i 's/#GRUB_COLOR_/GRUB_COLOR_/g' "$CHROOT/etc/default/grub"
-    sed -i -E 's|#GRUB_THEME=.*|GRUB_THEME=\"/boot/grub/themes/balam-grub/theme\.txt\"|g' "$CHROOT/etc/default/grub"
-    sed -i 's|GRUB_COLOR_NORMAL="light-blue/black"|GRUB_COLOR_NORMAL="red/black"|g' "$CHROOT/etc/default/grub"
-    sed -i 's|GRUB_COLOR_HIGHLIGHT="light-cyan/blue"|GRUB_COLOR_HIGHLIGHT="light-red/blue"|' "$CHROOT/etc/default/grub"
+    sed -Ei "s|Arch|Balam|g;s|#GRUB_COLOR_|GRUB_COLOR_|g;\
+    s|#GRUB_THEME=.*|GRUB_THEME=\"/boot/grub/themes/balam-grub/theme\.txt\"|g;\
+    s|GRUB_COLOR_NORMAL=\"light-blue/black\"|GRUB_COLOR_NORMAL=\"red/black\"|g;\
+    s|GRUB_COLOR_HIGHLIGHT=\"light-cyan/blue\"|GRUB_COLOR_HIGHLIGHT=\"light-red/black\"|g"\
+     $CHROOT/etc/default/grub
+    sed -i "s/menuentry '\$LABEL'/menuentry '\$LABEL' --class efi/g" "$CHROOT/etc/grub.d/30_uefi-firmware"
     if [ "$BOOT_MODE" = 'uefi' ]
     then
       chroot $CHROOT pacman -S efibootmgr --noconfirm --overwrite='*' --needed \
-          > $VERBOSE 2>&1
+          >> $VERBOSE 2>&1
       local target="i386"
       if [ "$(cat /sys/firmware/efi/fw_platform_size)" -eq 64 ]
       then
         target="x86_64"
       fi
-      chroot $CHROOT grub-install --target="${target}-efi" --efi-directory=/boot/ --bootloader-id=GRUB > $VERBOSE 2>&1
+      chroot $CHROOT grub-install --target="${target}-efi" --efi-directory=/boot/ --bootloader-id=GRUB >> $VERBOSE 2>&1
     else
-      chroot $CHROOT grub-install --target=i386-pc "$HD_DEV" > $VERBOSE 2>&1
+      chroot $CHROOT grub-install --target=i386-pc "$HD_DEV" >> $VERBOSE 2>&1
     fi
     local ecode=$?
-    kill %1
+    kill %1 2>/dev/null
+    animation "Cloning and installing grub2 theme" &
     if [ $ecode -ne 0 ]
     then
       err "An error ocurred while installing grub and the system wont be able to boot, solve it once the installation ends"
       sleep 5
     fi
+
     mkdir -p /boot/grub/themes
-    GIT_TERMINAL_PROMPT=0 git clone $GRUB_THEME $CHROOT/boot/grub/themes/balam-grub
-    check $? "grub theme"
+    GIT_TERMINAL_PROMPT=0 git clone $GRUB_THEME $CHROOT/boot/grub/themes/balam-grub >> $VERBOSE 2>&1
 
-    chroot $CHROOT grub-mkconfig -o /boot/grub/grub.cfg > $VERBOSE 2>&1
+    kill_job "Cloning"
+    printf "\r[+] Generating /boot/grub/grub.cfg, please wait a moment.\n"
+    chroot $CHROOT grub-mkconfig -o /boot/grub/grub.cfg >> $VERBOSE 2>&1
+
     sed -i "s/'uefi-firmware'/'uefi-firmware' --class efi/g" $CHROOT/boot/grub/grub.cfg
-
   fi
-  chroot $CHROOT pacman -Sy --noconfirm linux filesystem #TODO check if system is able to boot without this
+
+  chroot $CHROOT pacman -Sy --noconfirm linux filesystem >> $VERBOSE 2>&1 #TODO check if system is able to boot without this
+
   return $SUCCESS
 }
 
@@ -1810,11 +2007,23 @@ ask_user_account()
   then
     wprintf '[?] User name: '
     read -r NORMAL_USER
+  else
+    echo -e "\n    ${RED}${CNF_MSGS[$JUST_A_COUNTER]}$NC"
+    if ((JUST_A_COUNTER+1 < ${#CNF_MSGS[@]}))
+    then
+      ((JUST_A_COUNTER++))
+    fi
+    sleep 2
+    ask_user_account
   fi
-
+  if [[ ! $NORMAL_USER =~ ^[[:alpha:]][[:alpha:][:digit:]_-]{2,15}$ ]]
+  then
+    err "Invalid username format, it must be between 3 and 15 alphanumeric characters (- and _ allowed)"
+    err "and has to start with a aphabetic character"
+    ask_user_account
+  fi
   return $SUCCESS
 }
-
 
 # setup blackarch test user (not active + lxdm issue)
 setup_testuser()
@@ -1825,9 +2034,9 @@ setup_testuser()
   printf "\n\n"
   warn 'Remove this user after you added a normal system user account'
   printf "\n"
-  chroot $CHROOT groupadd blackarchtest > $VERBOSE 2>&1
+  chroot $CHROOT groupadd blackarchtest >> $VERBOSE 2>&1
   chroot $CHROOT useradd -g blackarchtest -d /home/blackarchtest/ \
-    -s /sbin/nologin -m blackarchtest > $VERBOSE 2>&1
+    -s /sbin/nologin -m blackarchtest >> $VERBOSE 2>&1
   NORMAL_USER="blackarchtest"
 }
 
@@ -1838,21 +2047,22 @@ setup_user()
   user="$(echo "$1" | tr -dc '[:alnum:]_' | tr '[:upper:]' '[:lower:]' |
     cut -c 1-32)"
 
-  title 'Base System Setup s> User'
+  title "Base System Setup > User $user"
 
   wprintf "[+] Setting up $user account"
-  printf "\n\n"
+  printf "\n"
 
   # normal user
   if [ $1 == "root" ]
   then
-    chroot $CHROOT chsh -s /usr/bin/zsh > $VERBOSE 2>&1
+    chroot $CHROOT chsh -s /usr/bin/zsh >> $VERBOSE 2>&1
+    printf "\n"
   elif [ -n "$NORMAL_USER" ]
   then
-    chroot $CHROOT groupadd "$user" > $VERBOSE 2>&1
+    chroot $CHROOT groupadd "$user" >> $VERBOSE 2>&1
     chroot $CHROOT useradd -g "$user" -d "/home/$user" -s "/usr/bin/zsh" \
-      -G "$user,wheel,users,video,audio" -m "$user" > $VERBOSE 2>&1
-    chroot $CHROOT chown -R "$user":"$user" "/home/$user" > $VERBOSE 2>&1
+      -G "$user,wheel,users,video,audio" -m "$user" >> $VERBOSE 2>&1
+    chroot $CHROOT chown -R "$user":"$user" "/home/$user" >> $VERBOSE 2>&1
     wprintf "[+] Added user: $user"
     printf "\n\n"
   fi
@@ -1871,7 +2081,6 @@ setup_user()
     fi
     res=$?
   done
-
   return $SUCCESS
 }
 
@@ -1880,11 +2089,11 @@ reinitialize_keyring()
   title 'Base System Setup > Keyring Reinitialization'
 
   wprintf '[+] Reinitializing keyrings'
-  printf "\n"
-  animation "Updaing keyrings" &
-  chroot $CHROOT pacman -S --overwrite='*' --noconfirm archlinux-keyring blackarch-keyring\
-    > $VERBOSE 2>&1
-  kill %1
+  printf "\n\n"
+  animation "Updating keyrings" &
+  chroot $CHROOT pacman -S --overwrite='*' --noconfirm archlinux-keyring\
+    >> $VERBOSE 2>&1
+  kill %1 2>/dev/null
   return $SUCCESS
 }
 
@@ -1943,7 +2152,7 @@ setup_extra_packages()
   > Fonts       : $(echo "$FONT_PKGS" | wc -w) packages
   > Hardware    : $(echo "$hardware" | wc -w) packages
   > Audio       : $(echo "$AUDIO_PKGS" | wc -w) packages
-  > Kernel      : $(echo "$kernel" | wc -w) packages
+  > Kernel      : $(echo "$KERNEL_PKGS" | wc -w) packages
   > Misc        : $(echo "$MISC_PKGS" | wc -w) packages
   > Network     : $(echo "$NETWORK_PKGS" | wc -w) packages
   > Xorg        : $(echo "$XORG_PKGS" | wc -w) packages
@@ -1951,18 +2160,17 @@ setup_extra_packages()
 
   warn 'This can take a while, please wait...'
   printf "\n"
-  echo "ALL :$all ||"
   animation "Installing packages" &
   chroot $CHROOT pacman -Sy --disable-download-timeout --needed --overwrite='*' --noconfirm $all \
-    > $VERBOSE 2>&1
+    >> $VERBOSE 2>&1
   if [ $? -ne 0 ]
   then
     clear_log
     err "See the log at /tmp/balamos-install.log"
-    kill %1
+    kill %1 2>/dev/null
     exit 1
   fi
-  kill %1
+  kill %1 2>/dev/null
   return $SUCCESS
 }
 
@@ -1970,15 +2178,17 @@ setup_aur_helper(){
   title "Base System Setup > Aur helper"
   git_build "paru" "https://aur.archlinux.org/paru-bin.git"
   echo '[+] Creating yay alias'
-  chroot $CHROOT ln -s /usr/bin/paru /usr/bin/yay > $VERBOSE 2>&1
+  chroot $CHROOT ln -s /usr/bin/paru /usr/bin/yay >> $VERBOSE 2>&1
   return $SUCCESS
 }
 
 setup_ohmyzsh(){
   title "Base System > oh-my-zsh!"
-  chroot $CHROOT sh -c "ZSH='/usr/share/oh-my-zsh' $(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended > $VERBOSE 2>&1
-  cp -r /usr/share/oh-my-zsh/plugins/. $CHROOT/usr/share/oh-my-zsh/plugins/
+  animation "Installing oh-my-zsh" &
+  chroot $CHROOT sh -c "ZSH='/usr/share/oh-my-zsh' $(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended >> $VERBOSE 2>&1
   check $? "oh-my-zsh"
+  cp -r /usr/share/oh-my-zsh/plugins/. $CHROOT/usr/share/oh-my-zsh/plugins/ 
+  kill %1 2>/dev/null
 }
 
 print_dots(){
@@ -2000,9 +2210,10 @@ print_dots(){
     for profile in $(cat $BI_PATH/profiles.list)
     do
       echo ">> $i.${profile^}"
-      i=$(($i+1))
+      ((i++))
     done
-    wprintf "[?] Choose a dotfiles profile (images at https://github.com/<profile>/balam-dotfiles)"
+    printf "\n"
+    wprintf "[?] Choose a dotfiles profile (images at https://github.com/<profile>/balam-dotfiles): "
     read -r dotprofile
     dotprofile=$(sed "${dotprofile}q;d" $BI_PATH/profiles.list 2>/dev/null)
     if [ -z "$dotprofile" ]
@@ -2040,9 +2251,6 @@ dotfiles_load(){
         "backgrounds")
           target="usr/share/backgrounds/"
         ;;
-        "lightdm-theme")
-          target="usr/share/lightdm-webkit/themes/balam/"
-        ;;
         "ohmyzsh-themes")
           target="usr/share/oh-my-zsh/themes/"
         ;;
@@ -2057,15 +2265,9 @@ dotfiles_load(){
           continue
         ;;
       esac
-      cp -r $route/. $CHROOT/$target > $VERBOSE 2>&1
-    elif [ -f "$route" ]
-    then
-      case ${route##*/} in
-        "ly.conf")
-          target="/etc/ly/config.ini"
-        ;;
-      esac
+      cp -rf $route/. $CHROOT/$target >> $VERBOSE 2>&1
     fi
+    echo " - Moving $route -> $target" >> $VERBOSE 2>&1
   done
   if [ -f $path/packages.list ]
   then
@@ -2076,10 +2278,12 @@ dotfiles_load(){
 
 
 skel_push(){
+  cp -r ${CHROOT}/etc/skel/. $CHROOT/root >> $VERBOSE 2>&1
+  cp -f /root/.zshrc $CHROOT/root/.zshrc >> $VERBOSE 2>&1
   if [ -n "$NORMAL_USER" ]
   then
-    cp -r ${CHROOT}/etc/skel/. $CHROOT/home/$NORMAL_USER/ > $VERBOSE 2>&1
-    chroot $CHROOT chown -R "$NORMAL_USER":"$NORMAL_USER" "/home/$NORMAL_USER" > $VERBOSE 2>&1
+    cp -r ${CHROOT}/etc/skel/. $CHROOT/home/$NORMAL_USER/ >> $VERBOSE 2>&1
+    chroot $CHROOT chown -R "$NORMAL_USER":"$NORMAL_USER" "/home/$NORMAL_USER" >> $VERBOSE 2>&1
 
   fi
 }
@@ -2087,16 +2291,18 @@ skel_push(){
 #Copy all dotfiles to its destination
 prepare_cfiles(){
   title "Base System Setup > System settings"
-  cp -r /etc/skel $CHROOT/etc/skel > $VERBOSE 2>&1
-  cp -r /usr/share/oh-my-zsh/themes/balamos*.zsh-theme $CHROOT/usr/share/oh-my-zsh/themes > $VERBOSE 2>&1
+
+  cp -r /usr/share/oh-my-zsh/themes/balamos*.zsh-theme $CHROOT/usr/share/oh-my-zsh/themes >> $VERBOSE 2>&1
 
   check $? "base dotfiles"
   print_dots
-  GIT_TERMINAL_PROMPT=0 git clone https://github.com/${dotprofile}/balam-dotfiles.git /tmp/${dotprofile}-dots > $VERBOSE 2>&1
+  echo "[+] Downloading $dotprofile dotfiles"
+  animation "Cloning $dotprofile/balam-dotfiles.git" &
+  GIT_TERMINAL_PROMPT=0 git clone https://github.com/${dotprofile}/balam-dotfiles.git /tmp/${dotprofile}-dots >> $VERBOSE 2>&1
   check $? "custom theme"
+  kill_job "Cloning"
 
   dotfiles_load "/tmp/${dotprofile}-dots"
-  read whaterver #TODO remove
 }
 
 # perform system base setup/configurations
@@ -2159,7 +2365,7 @@ enable_iwd_networkd()
   wprintf '[+] Enabling Iwd and Networkd'
   printf "\n\n"
 
-  chroot $CHROOT systemctl enable iwd systemd-networkd > $VERBOSE 2>&1
+  chroot $CHROOT systemctl enable iwd systemd-networkd >> $VERBOSE 2>&1
 
   return $SUCCESS
 }
@@ -2174,10 +2380,10 @@ update_etc()
   printf "\n\n"
 
   # /etc/*
-  cp -r "/etc/"{arch-release,issue,motd,os-release,sysctl.d,systemd,lsb-release} "$CHROOT/etc/." > $VERBOSE 2>&1
+  cp -r "/etc/"{arch-release,issue,motd,os-release,sysctl.d,systemd,lsb-release} "$CHROOT/etc/." >> $VERBOSE 2>&1
 
   # /usr/lib/lsb-release
-  cp "/usr/lib/lsb-release" "$CHROOT/usr/lib/" > $VERBOSE 2>&1
+  cp "/usr/lib/lsb-release" "$CHROOT/usr/lib/" >> $VERBOSE 2>&1
 
   return $SUCCESS
 }
@@ -2194,7 +2400,7 @@ ask_mirror()
   mirror_file='/tmp/mirror.lst'
 
   wprintf '[+] Fetching mirror list'
-  curl -s -o $mirror_file $mirror_url > $VERBOSE
+  curl -s -o $mirror_file $mirror_url >> $VERBOSE
 
   while read -r country url mirror_name
   do
@@ -2238,12 +2444,14 @@ ask_mirror_arch()
     printf "\n"
     warn 'This may take time depending on your connection'
     printf "\n"
+    animation "Fetching the best mirror" &
     $mirrold
-    pacman -Sy --noconfirm > $VERBOSE 2>&1
-    pacman -S --needed --noconfirm reflector > $VERBOSE 2>&1
-    yes | pacman -Scc > $VERBOSE 2>&1
+    pacman -Sy --noconfirm >> $VERBOSE 2>&1
+    pacman -S --needed --noconfirm reflector >> $VERBOSE 2>&1
+    yes | pacman -Scc >> $VERBOSE 2>&1
     reflector --verbose --latest 5 --protocol https --sort rate \
-      --save /etc/pacman.d/mirrorlist > $VERBOSE 2>&1
+      --save /etc/pacman.d/mirrorlist >> $VERBOSE 2>&1
+    kill %1 2>/dev/null
   else
     printf "\n"
     warn 'Using Worldwide mirror server'
@@ -2262,40 +2470,103 @@ ask_mirror_arch()
 # pass correct config
 pass_mirror_conf()
 {
-  mkdir -p "$CHROOT/etc/pacman.d/" > $VERBOSE 2>&1
+  mkdir -p "$CHROOT/etc/pacman.d/" >> $VERBOSE 2>&1
   cp -f /etc/pacman.d/{blackarch-,}mirrorlist "$CHROOT/etc/pacman.d/" \
-    > $VERBOSE 2>&1
+    >> $VERBOSE 2>&1
 }
 
+# verify the keyring signature
+# note: this is pointless if you do not verify the key fingerprint
+verify_keyring()
+{
+  echo -n "[+] Verifying keyring " >> $VERBOSE
+  animation "Installing keys" &
+  gpg --keyserver keyserver.ubuntu.com \
+    --recv-keys F9A6E68A711354D84A9B91637533BAFE69A25079 > /dev/null 2>&1
+  if ! gpg --keyserver keyserver.ubuntu.com \
+     --recv-keys 4345771566D76038C7FEB43863EC0ADBEA87E4E3 > /dev/null 2>&1
+  then
+    if ! gpg --keyserver hkps://keyserver.ubuntu.com:443 \
+       --recv-keys 4345771566D76038C7FEB43863EC0ADBEA87E4E3 > /dev/null 2>&1
+    then
+      if ! gpg --keyserver hkp://pgp.mit.edu:80 \
+         --recv-keys 4345771566D76038C7FEB43863EC0ADBEA87E4E3 > /dev/null 2>&1
+      then
+          echo ""
+          err "Could not verify the key. Please check: https://blackarch.org/faq.html"
+      fi
+    fi
+  fi
+  kill_job "Installing"
+  if ! gpg --keyserver-options no-auto-key-retrieve \
+    --with-fingerprint ${CHROOT}/tmp/blackarch-keyring.pkg.tar.zst.sig > /dev/null 2>&1
+  then
+    echo ""
+    err "Invalid keyring signature. please stop by https://matrix.to/#/#/BlackaArch:matrix.org"
+  fi
+  echo -e "${GREEN}[OK]${NC}" >> $VERBOSE
+}
 
 # run strap.sh
 run_strap_sh()
 {
-  strap_sh='/tmp/strap.sh'
-  orig_sha1="$(curl -s https://blackarch.org/checksums/strap | awk '{print $1}')"
-
   title 'BalamOs Linux Setup > Strap'
 
-  wprintf '[+] Downloading and executing strap.sh'
+  wprintf '[+] Emulating blackarch strap.sh'
   printf "\n\n"
   warn 'This can take a while, please wait...'
   printf "\n"
+  animation "Downloading keys" &
+  local mirror_p="${CHROOT}/etc/pacman.d"
+  local mirror_r="https://blackarch.org"
+  local MIRROR_F="blackarch-mirrorlist"
+  local GPG_CONF="${CHROOT}/etc/pacman.d/gnupg/gpg.conf"
 
-  curl -s -o $strap_sh 'https://www.blackarch.org/strap.sh' > $VERBOSE 2>&1
-  sha1="$(sha1sum $strap_sh | awk '{print $1}')"
-
-  if [ "$sha1" = "$orig_sha1" ]
+  if ! grep -q 'allow-weak-key-signatures' $GPG_CONF
   then
-    mv $strap_sh "${CHROOT}${strap_sh}"
-    chmod a+x "${CHROOT}${strap_sh}"
-    chroot $CHROOT echo "$BA_REPO_URL" | sh ${CHROOT}${strap_sh} > $VERBOSE 2>&1
-  else
-    { err "Wrong SHA1 sum for strap.sh: $sha1 (orig: $orig_sha1). Aborting!"; exit $FAILURE; }
+    echo 'allow-weak-key-signatures' >> $GPG_CONF
+  fi
+
+  curl -s $BA_KEYRING > ${CHROOT}/tmp/blackarch-keyring.pkg.tar.zst
+  curl -s "$BA_KEYRING.sig" > ${CHROOT}/tmp/blackarch-keyring.pkg.tar.zst.sig
+
+  kill %1 2>/dev/null
+  printf "\r                          "
+
+  verify_keyring
+  
+  animation "Installing keyring" &
+
+  if [ -f "${CHROOT}/tmp/blackarch-keyring.pkg.tar.zst.sig" ]; then
+    rm ${CHROOT}/tmp/blackarch-keyring.pkg.tar.zst.sig
+  fi
+
+  if ! chroot $CHROOT pacman --config /dev/null --noconfirm \
+    -U /tmp/blackarch-keyring.pkg.tar.zst >> $VERBOSE 2>&1; then
+      kill %1 2>/dev/null
+      err 'keyring installation failed'
+  fi
+  kill %1 2>/dev/null
+
+  # hotfix for Blackarch #4061
+  animation "Populating keyring" &
+  chroot $CHROOT pacman-key --recv-key F9A6E68A711354D84A9B91637533BAFE69A25079 >> $VERBOSE 2>&1
+  echo "F9A6E68A711354D84A9B91637533BAFE69A25079:4:" >> $CHROOT/usr/share/pacman/keyrings/blackarch-trusted
+  chroot $CHROOT pacman-key --populate >> $VERBOSE 2>&1
+
+  kill_job "Populating"
+
+  echo ""
+  echo "[+] Fetching new mirror list..." >> $VERBOSE
+  if ! curl -s "$mirror_r/$MIRROR_F" -o "$mirror_p/$MIRROR_F" ; then
+    err "We couldn't fetch the mirror list from: $mirror_r/$MIRROR_F"
   fi
 
   # add blackarch linux mirror if we are in chroot
   if ! grep -q 'blackarch' "$CHROOT/etc/pacman.conf"
   then
+    echo ""
+    echo "[+] Adding blackarch mirror"
     printf '[blackarch]\nServer = %s\nInclude = /etc/pacman.d/blackarch-mirrorlist' "$BA_REPO_URL" \
       >> "$CHROOT/etc/pacman.conf"
   else
@@ -2303,10 +2574,7 @@ run_strap_sh()
       "$CHROOT/etc/pacman.conf"
   fi
 
-  chroot $CHROOT pacman-key --populate archlinux blackarch
-  #chroot $CHROOT pacman-key --lsign F9A6E68A711354D84A9B91637533BAFE69A25079 #TODO This should't be needed
-
-  #copy balam os updater to final system
+  # copy balam os updater to final system
   cp /usr/bin/balamos-update ${CHROOT}/usr/bin/balamos-update
   cp /usr/share/balamos_lastpatch ${CHROOT}/usr/share/balamos_lastpatch
 
@@ -2332,21 +2600,22 @@ setup_display_manager()
 {
   title 'BalamOs Linux Setup > Display Manager'
 
-  wprintf '[+] Installing Display Manager packages:'
+  echo '[+] Installing Display Manager packages:'
   print_pkgs ${DM_PKGS[@]}
-  printf "\n\n"
-
+  printf "\n"
+  animation "Downloading packages" &
   # install ligthdm packages
   local pkgs=$(extra_pkgs_cleanup ${DM_PKGS[@]})
 
   chroot $CHROOT pacman -S ${pkgs%|*}  --needed --overwrite='*' \
-    --noconfirm > $VERBOSE 2>&1
-
+    --noconfirm >> $VERBOSE 2>&1
+  kill_job "Downloading"
+  printf "\r[~] Downloading packages... [OK]"
   for pkg in ${pkgs#*|}
   do
     git_build $(echo ${pkg##*/} | cut -f1 -d.) $pkg
   done
-  sed -i 's/--autologin root//g'  $CHROOT/etc/systemd/system/getty@tty1.service.d/autologin.conf
+  rm -fr $CHROOT/etc/systemd/system/getty@tty1.service.d/
 
   # config files
   cp -r /usr/share/icons/. "$CHROOT/usr/share/icons/."
@@ -2354,11 +2623,12 @@ setup_display_manager()
   cp /usr/share/fonts/opentype/{conthrax-sb,DroidSansMNerdFontMono-Regular}.otf $CHROOT/usr/share/fonts/opentype/
   cp /usr/share/fonts/TTF/HackNFM-Regular.ttf $CHROOT/usr/share/fonts/TTF/
 
-  chroot $CHROOT systemctl enable ${pkgs%%|*} > $VERBOSE 2>&1
+  chroot $CHROOT systemctl enable ${pkgs%%|*} >> $VERBOSE 2>&1
 
   if [[ ${pkgs[@]} =~ ly ]]
   then
-    sed -i "s|/dev/tty2|/dev/tty7|g" $CHROOT/usr/lib/systemd/system/ly.service
+    cp -f /tmp/${dotprofile}-dots/ly.conf $CHROOT/etc/ly/config.ini
+    sed -i "s|tty2|tty7|g" $CHROOT/usr/lib/systemd/system/ly.service
   elif [[ ${pkgs[@]} =~ lightdm ]]
   then
       local ldmg=$(echo ${DM_PKGS[@]} | grep greeter)
@@ -2376,17 +2646,23 @@ setup_display_manager()
 # setup window managers
 setup_window_managers()
 {
-  title 'BalamOs Linux Setup > Window Managers'
+  title 'BalamOs Linux Setup > Window Manager'
 
-  wprintf '[+] Installing Window Manager packages:'
+  echo '[+] Installing Window Manager packages:'
   print_pkgs ${WM_PKGS[@]}
-  printf "\n\n"
+  printf "\n"
 
   local pkgs=$(extra_pkgs_cleanup ${WM_PKGS[@]})
 
-  chroot $CHROOT pacman -S ${pkgs%|*}  --needed --overwrite='*' \
-    --noconfirm > $VERBOSE 2>&1
+  animation "Installing packages" &
 
+  chroot $CHROOT pacman -S ${pkgs%|*}  --needed --overwrite='*' \
+    --noconfirm >> $VERBOSE 2>&1
+
+  kill %1 2>/dev/null
+  printf "\r[~] Installing packages... [OK]\n"
+
+  local pkg
   for pkg in ${pkgs#*|}
   do
     git_build $(echo ${pkg##*/} | cut -f1 -d.) $pkg
@@ -2399,7 +2675,7 @@ setup_window_managers()
   cp -r "/usr/share/backgrounds" "$CHROOT/usr/share/backgrounds/"
 
   # remove wrong xsession entries
-  chroot $CHROOT rm /usr/share/xsessions/i3-with-shmlog.desktop > $VERBOSE 2>&1
+  chroot $CHROOT rm /usr/share/xsessions/i3-with-shmlog.desktop >> $VERBOSE 2>&1
 
   return $SUCCESS
 }
@@ -2424,16 +2700,15 @@ setup_vbox_utils()
 
   wprintf '[+] Setting up VirtualBox utils'
   printf "\n\n"
-
+  animation "Installing VirtualBox utils" &
   chroot $CHROOT pacman -S virtualbox-guest-utils --overwrite='*' --needed \
-    --noconfirm > $VERBOSE 2>&1
+    --noconfirm >> $VERBOSE 2>&1
 
-  chroot $CHROOT systemctl enable vboxservice > $VERBOSE 2>&1
+  chroot $CHROOT systemctl enable vboxservice >> $VERBOSE 2>&1
 
   cp -r "/etc/xdg/autostart/vboxclient.desktop" \
-    "$CHROOT/etc/xdg/autostart/." > $VERBOSE 2>&1
-
-  #TODO check, vbox loaded but not working
+    "$CHROOT/etc/xdg/autostart/." >> $VERBOSE 2>&1
+  kill %1 2>/dev/null
   return $SUCCESS
 }
 
@@ -2457,14 +2732,15 @@ setup_vmware_utils()
 
   wprintf '[+] Setting up VMware utils'
   printf "\n\n"
+  animation "Installing VMWare utils" &
 
   chroot $CHROOT pacman -S open-vm-tools xf86-video-vmware \
     xf86-input-vmmouse --overwrite='*' --needed --noconfirm \
-    > $VERBOSE 2>&1
+    >> $VERBOSE 2>&1
 
-  chroot $CHROOT systemctl enable vmware-vmblock-fuse.service > $VERBOSE 2>&1
-  chroot $CHROOT systemctl enable vmtoolsd.service > $VERBOSE 2>&1
-
+  chroot $CHROOT systemctl enable vmware-vmblock-fuse.service >> $VERBOSE 2>&1
+  chroot $CHROOT systemctl enable vmtoolsd.service >> $VERBOSE 2>&1
+  kill %1 2>/dev/null
   return $SUCCESS
 }
 
@@ -2480,6 +2756,15 @@ ask_ba_tools_setup()
   return $SUCCESS
 }
 
+# skip git tools, it makes the installation finish gracefully
+{
+  
+  umount_filesystems
+  sync_disk
+  easter_backdoor
+
+  clear_log
+}
 
 # setup blackarch tools from repository (binary) or via blackman (source)
 setup_blackarch_tools()
@@ -2504,22 +2789,38 @@ setup_blackarch_tools()
     sleep 2
     return $FALSE
   fi
-  tools=$(cat /tmp/${dotprofile}-dots/tools.list)
-  toolset=()
+
   wprintf "[+] Installing $dotprofile's toolset:\n"
   print_pkgs $tools
   printf "\n"
   warn 'This can take a while, please wait...'
-  printf "\n"
   check_space
-  printf "\n\n"
-  chroot $CHROOT pacman -Sy --needed --noconfirm --overwrite='*' $(echo $tools | tr "\n" " ") > $VERBOSE 2>&1
-  check $? 'installing toolset'
+  printf "\n"
+  animation "Installing tools" &
+  
+  local toolset=$(extra_pkgs_cleanup $(cat /tmp/${dotprofile}-dots/tools.list))
+
+  chroot $CHROOT pacman -S ${toolset%|*}  --needed --overwrite='*' \
+    --noconfirm >> $VERBOSE 2>&1
+
   if [[ ${toolset[@]} =~ wordlistctl ]]
   then
     cp -r /usr/share/wordlists/ $CHROOT/usr/share/wordlists
     chmod -R 777 $CHROOT/usr/share/wordlists
   fi
+
+  kill %1 2>/dev/null
+
+  if confirm 'BalamOs Linux Setup > Tools > Git tools' "[?] Some of the tools need to be compiled, wanna install them anyways? [Y/n]: " "y"
+  then
+    trap skip_git_tools 2
+    local tool
+    for tool in ${toolset#*|}
+    do
+      git_build $(echo ${tool##*/} | cut -f1 -d.) $tool
+    done
+  fi
+
   return $SUCCESS
 }
 
@@ -2533,11 +2834,11 @@ update_user_groups()
 
   if [ $VBOX_SETUP -eq $TRUE ]
   then
-    chroot $CHROOT usermod -aG 'vboxsf,audio,video' "$user" > $VERBOSE 2>&1
+    chroot $CHROOT usermod -aG 'vboxsf,audio,video' "$user" >> $VERBOSE 2>&1
   fi
 
   # sudoers
-  echo "$user ALL=(ALL) ALL" >> $CHROOT/etc/sudoers > $VERBOSE 2>&1
+  echo "$user ALL=(ALL) ALL" >> $CHROOT/etc/sudoers >> $VERBOSE 2>&1
 
   return $SUCCESS
 }
@@ -2554,10 +2855,8 @@ setup_blackarch()
   run_strap_sh
 
   setup_display_manager
-  read whaterver #TODO remove
 
   setup_window_managers
-  read whaterver #TODO remove
 
   ask_vbox_setup
 
@@ -2637,7 +2936,7 @@ self_updater()
   title 'Self Updater'
   wprintf '[+] Checking for a new version of myself...'
   printf "\n\n"
-  local rversion=$(curl https://raw.githubusercontent.com/BICH0/balamOs/master/installer.sh 2>/dev/null | tee /tmp/installer.sh | grep VERSION2= | sed -E "s/.+=//g;s/'//g")
+  local rversion=$(curl -s https://raw.githubusercontent.com/BICH0/balamOs/master/installer.sh 2>/dev/null | tee /tmp/installer.sh | grep VERSION2= | head -1 | sed -E "s/.+=//g;s/'//g")
   local lversion=$(echo $VERSION2 | sed -E "s/.+=//g;s/'//g")
   local update=0
 
@@ -2736,7 +3035,7 @@ main()
   if [ $? -ne $SUCCESS ]
   then
     err "Unable to unmount devices, try manually unmounting the following"
-    mount -l | grep "/mnt"
+    mount -l | grep "$CHROOT"
   fi
   
   ask_cfdisk

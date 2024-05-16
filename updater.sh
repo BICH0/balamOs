@@ -1,6 +1,6 @@
 #!/bin/bash
 
-UPDATER_VERSION='0.0.1'
+UPDATER_VERSION='0.0.2'
 CHANGES="this is just a test"
 
 process_update(){
@@ -15,6 +15,8 @@ process_update(){
 ####### STATIC CODE BELOW
 
 NOCONFIRM=0
+BU_PATH="/usr/bin/balamos-update"
+LVERSION_PATH="/usr/share/balamos_lastpatch"
 
 #Color codes
 RED="\e[0;31m"
@@ -43,14 +45,21 @@ compare_ver(){
 }
 
 check_needed(){
-    compare_ver $(cat /usr/share/balamos_lastpatch 2>/dev/null) $UPDATER_VERSION
+    compare_ver $(cat $LVERSION_PATH 2>/dev/null) $UPDATER_VERSION
     if [ $? -eq 1 ]
     then
         start_update
     else
         echo "[+] Checking if update is available"
-        curl https://raw.githubusercontent.com/BICH0/balamOs/master/updater.sh > /tmp/updater.sh
-        
+        curl -s https://raw.githubusercontent.com/BICH0/balamOs/master/updater.sh > /tmp/updater.sh
+        compare_ver $UPDATER_VERSION $(grep "UPDATER_VERSION=" /tmp/updater.sh | sed -E "s/.+=//g;s/'//g")
+        if [ $? -eq 1 ]
+        then
+            $(/tmp/updater.sh $*) && exit
+        else
+            echo -e "\n[!] Nothing to update, y'all good 4 now...\n"
+            exit 0
+        fi
     fi
 }
 
@@ -75,8 +84,8 @@ start_update(){
     local update=()
     if [ "$change_num" -eq 0 ]
     then
-        echo "[!] Nothing to update, y'all good 4 now..."
-        #exit 0
+        echo "\n[!] Just self update, nothing to really update, y'all good 4 now...\n"
+        exit 0
     fi
     printf "These are the current changes: \n"
     for ((i=0; i<$change_num; i++))
@@ -130,9 +139,13 @@ main(){
         echo -e "${RED}[!] This updater can only be launched as root\nTry sudo balamos-updater${NC}\n"
         exit 1
     fi
+    if [ "$0" != $BU_PATH ]
+    then
+        cp -f $0 $BU_PATH
+    fi
     process_args $*
-    check_needed
-    echo $UPDATER_VERSION > /usr/share/balamos_lastpatch
+    check_needed $*
+    echo $UPDATER_VERSION > $LVERSION_PATH
     echo ""
     exit 0
 }

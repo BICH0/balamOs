@@ -129,18 +129,16 @@ checkOutput
 echo -n " - Updating local dotfiles"
 cp -rf ${WORKDIR}/balam-dotfiles/skel/. ${WORKDIR}/skel/ 1>/dev/null
 checkOutput
-echo -n " - Adding skel"
+echo " - Adding skel"
 bulkMove "${WORKDIR}/skel/" "${WORKDIR}/liveiso/airootfs/etc/skel/"
-checkOutput
 mv "${WORKDIR}/liveiso/airootfs/etc/skel/.zshrc" "${WORKDIR}/liveiso/airootfs/etc/skel/.zshrc.bak" #Without this build will fail due to grml-zsh-config
 
 info "Adding skel to root"
 echo -n " - Updating local root dotfiles"
 cp -rf ${WORKDIR}/balam-dotfiles/root/. ${WORKDIR}/root/ 1>/dev/null
 checkOutput
-echo -n " - Adding root dotfiles"
+echo " - Adding root dotfiles"
 bulkMove ${WORKDIR}/liveiso/airootfs/etc/skel/ ${WORKDIR}/liveiso/airootfs/root/
-checkOutput
 rm ${WORKDIR}/liveiso/airootfs/root/.zshrc.bak 2>/dev/null #Line 110 for more info
 echo -n " - Trimming unnecesary files"
 rm ${WORKDIR}/liveiso/airootfs/root/.config/{i3,dunst,polybar,rofi} ${WORKDIR}/liveiso/airootfs/root/.mozilla ${WORKDIR}/liveiso/airootfs/root/.conkyrc 2>/dev/null
@@ -211,7 +209,7 @@ do
 	if [ ! -f "${WORKDIR}/$file" ]
 	then
 		echo -n " - Downloading $file"
-		curl "https://raw.githubusercontent.com/$REPO/$BRANCH/$file" > ${WORKDIR}/$file
+		curl -s "https://raw.githubusercontent.com/$REPO/$BRANCH/$file" > ${WORKDIR}/$file
 		checkOutput
 		if [ $? -ne 0 ]
 		then
@@ -399,16 +397,16 @@ echo -n " - Creating wordlists directory"
 mkdir -p ${WORKDIR}/liveiso/airootfs/usr/share/wordlists/{passwords,discovery}
 checkOutput
 echo -n " - Downloading rockyou.txt.tgz"
-curl https://download.weakpass.com/wordlists/90/rockyou.txt.gz > ${WORKDIR}/liveiso/airootfs/usr/share/wordlists/passwords/rockyou.txt.gz
+curl -s https://download.weakpass.com/wordlists/90/rockyou.txt.gz > ${WORKDIR}/liveiso/airootfs/usr/share/wordlists/passwords/rockyou.txt.gz
 checkOutput
 echo -n " - Downloading directory-list-2.3-big.txt"
-curl https://raw.githubusercontent.com/igorhvr/zaproxy/master/src/dirbuster/directory-list-2.3-big.txt > ${WORKDIR}/liveiso/airootfs/usr/share/wordlists/discovery/directory-list-2.3-big.txt
+curl -s https://raw.githubusercontent.com/igorhvr/zaproxy/master/src/dirbuster/directory-list-2.3-big.txt > ${WORKDIR}/liveiso/airootfs/usr/share/wordlists/discovery/directory-list-2.3-big.txt
 checkOutput
 echo -n "   - Compressing"
 tar -I 'gzip -9' -czf ${WORKDIR}/liveiso/airootfs/usr/share/wordlists/discovery/directory-list-2.3-big.txt.tgz ${WORKDIR}/liveiso/airootfs/usr/share/wordlists/discovery/directory-list-2.3-big.txt
 checkOutput
 echo -n " - Downloading dsstorewordlist.txt"
-curl https://raw.githubusercontent.com/aels/subdirectories-discover/main/dsstorewordlist.txt > ${WORKDIR}/liveiso/airootfs/usr/share/wordlists/discovery/dsstorewordlist.txt
+curl -s https://raw.githubusercontent.com/aels/subdirectories-discover/main/dsstorewordlist.txt > ${WORKDIR}/liveiso/airootfs/usr/share/wordlists/discovery/dsstorewordlist.txt
 checkOutput
 echo -n "   - Compressing"
 tar -I 'gzip -9' -czf ${WORKDIR}/liveiso/airootfs/usr/share/wordlists/discovery/dsstorewordlist.txt.tgz ${WORKDIR}/liveiso/airootfs/usr/share/wordlists/discovery/dsstorewordlist.txt
@@ -428,7 +426,7 @@ echo "exec_always --no-startup-id /home/balam/fixer.sh" >> ${WORKDIR}/liveiso/ai
 
 info "Injecting updater.sh"
 cp "${WORKDIR}/updater.sh" "${WORKDIR}/liveiso/airootfs/usr/bin/balamos-update"
-grep "UPDATER_VERSION=" "${WORKDIR}/updater.sh" | sed "s/.+='//g;s/'//g" > "${WORKDIR}/liveiso/airootfs/usr/share/balamos_lastpatch"
+grep "UPDATER_VERSION=" "${WORKDIR}/updater.sh" | sed -E "s/.+=//g;s/'//g" > "${WORKDIR}/liveiso/airootfs/usr/share/balamos_lastpatch"
 
 info "Starting building process"
 sudo mkarchiso -v -r -w ${WORKDIR}/workdir -o ${WORKDIR}/out ${WORKDIR}/liveiso

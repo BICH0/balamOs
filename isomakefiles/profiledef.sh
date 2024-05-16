@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2034
 
-iso_name="BalamOs"
+iso_name="balam"
 iso_label="BALAM_$(date --date="@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y%m)"
 iso_publisher="BiCH0 <https://balamos.confugiradores.es>"
 iso_application="Balam Os Live/Rescue DVD"

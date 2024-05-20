@@ -11,7 +11,7 @@
 
 # blackarch-installer version
 VERSION='1.2.24'
-VERSION2='1.0.0'
+VERSION2='1.0.1'
 
 ################ BASE PACKAGES #############
 
@@ -28,14 +28,14 @@ MISC_PKGS='acpi alsa-utils b43-fwcutter bash-completion bc cmake ctags expac
 feh vlc gpm haveged hdparm htop inotify-tools ipython irssi 
 linux-atm lsof mercurial mesa mlocate moreutils mpv p7zip rsync 
 rtorrent screen scrot smartmontools strace tmux udisks2 unace unrar 
-unzip upower usb_modeswitch usbutils zip man-db cargo python python-pip npm'
+unzip upower usb_modeswitch usbutils zip man-db cargo python python-pip npm tftp-hpa'
 NETWORK_PKGS='atftp bind-tools bridge-utils curl darkhttpd dhclient dhcpcd dialog
 dnscrypt-proxy dnsmasq dnsutils fwbuilder gnu-netcat iw 
 iwd lftp nfs-utils ntp openconnect openssh openvpn ppp pptpclient rfkill 
 rp-pppoe socat vpnc wget wireless_tools wpa_supplicant wvdial xl2tpd net-tools iputils'
 XORG_PKGS='alacritty xf86-video-dummy xf86-video-fbdev xf86-video-sisusb 
 xf86-video-vesa xorg-server xorg-xbacklight xorg-xinit dex breeze-gtk'
-
+AUR_PKGS='https://aur.archlinux.org/intel-opencl-runtime.git'
 ################ EXTRA PACKAGES #############
 
 DM_PKGS=('ly')
@@ -2173,6 +2173,11 @@ setup_extra_packages()
     exit 1
   fi
   kill %1 2>/dev/null
+  echo "[+] Installing aur packages"
+  for pkg in $AUR_PKGS
+  do
+    git_build $(echo ${pkg##*/} | cut -f1 -d.) $pkg
+  done
   return $SUCCESS
 }
 
@@ -2807,7 +2812,7 @@ setup_blackarch_tools()
 
   if [[ ${toolset[@]} =~ wordlistctl ]]
   then
-    cp -r /usr/share/wordlists/ $CHROOT/usr/share/wordlists
+    cp -r /usr/share/wordlists/. $CHROOT/usr/share/wordlists
     chmod -R 777 $CHROOT/usr/share/wordlists
   fi
 

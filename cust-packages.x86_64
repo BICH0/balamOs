@@ -17,6 +17,7 @@ blackarch-keyring
 ;;---Misc---
 dhcpcd
 openssh
+tftp-hpa
 inetutils
 nano ;;Text editor, may change it/add nvim
 ranger ;;TUI based file explorer
@@ -103,6 +104,7 @@ nmap
 wireshark-qt
 burpsuite
 gobuster
+sqlmap
 ;;---Reverse Enegeering---
 ghidra
 python-uncompyle6

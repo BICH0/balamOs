@@ -71,6 +71,7 @@ alias ls='ls --color=tty'
 alias lsa='ls -lah'
 alias rr='ranger'
 alias code='vscodium'
+alias ssh="TERM=xterm-256color $(which ssh)"
 
 #PATH="/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl:/opt/"
 #export PATH

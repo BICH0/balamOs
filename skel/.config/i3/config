@@ -189,12 +189,16 @@ bindsym $mod+v exec rofi -modi "clipboard:greenclip print" -show clipboard -run-
 bindsym $mod+g gaps inner 0;gaps outer 0
 bindsym $mod+Shift+g gaps outer 5px;gaps inner 30px
 
+# Launch powermenu
+bindsym $mod+Escape exec ~/.config/rofi/powermenu/powermenu.sh
+
 # launchig feh (background)
 exec --no-startup-id feh --bg-fill /usr/share/backgrounds/balam01.png
 
 # launching polybar
 exec_always --no-startup-id ~/.config/i3/polybar.sh
 
+# apply mozilla firefox profile
 exec_always --no-startup-id ~/.mozilla/firefox/mozilla.sh
 
 # launching nm-applet
@@ -220,4 +224,4 @@ client.background       #FFFFFF
 for_window [instance="copyq"] floating enable
 for_window [instance="ghidra-Ghidra" title="Ghidra Help"] floating enable
 for_window [instance="ghidra-Ghidra" title="win0"] floating enable
-for_window [instance="pavucontrol" title="win0"] floating enable
+for_window [instance="pavucontrol"] floating enable

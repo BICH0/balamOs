@@ -17,10 +17,13 @@ blackarch-keyring
 ;;---Misc---
 dhcpcd
 openssh
+libnotify
 tftp-hpa
 inetutils
 nano ;;Text editor, may change it/add nvim
+nano-syntax-highlighting
 ranger ;;TUI based file explorer
+w3m
 neofetch
 networkmanager
 net-tools ;;Add support for netstat,route,arp...
@@ -91,7 +94,6 @@ network-manager-applet
 flameshot
 ;;---GUI apps---
 firefox
-okular
 alacritty
 mpv
 feh
@@ -122,6 +124,7 @@ stegseek
 metasploit
 ;;---Anonymity---
 proxychains-ng
+macchanger
 ;;---Cms stuff---
 cmsfuzz
 ;;EOF

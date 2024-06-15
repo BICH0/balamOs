@@ -11,7 +11,8 @@
 
 # blackarch-installer version
 VERSION='1.2.24'
-VERSION2='1.0.1'
+VERSION2='1.0.2'
+LAST_PATCH='0.0.0'
 
 ################ BASE PACKAGES #############
 
@@ -19,12 +20,12 @@ KERNEL_PKGS='linux-headers'
 ARCH_PKGS='arch-install-scripts pkgfile'
 BT_PKGS='bluez bluez-hid2hci bluez-tools bluez-utils'
 BROWSER_PKGS='firefox'
-EDITOR_PKGS='hexedit nano'
+EDITOR_PKGS='hexedit nano nano-syntax-highlighting neovim'
 FS_PKGS='cifs-utils dmraid dosfstools exfat-utils f2fs-tools 
 gpart gptfdisk mtools nilfs-utils ntfs-3g partclone parted partimage'
-FONT_PKGS='ttf-dejavu ttf-indic-otf ttf-liberation xorg-fonts-misc ttf-hack ttf-hack-nerd noto-fonts-emoji terminus-font'
+FONT_PKGS='ttf-dejavu ttf-indic-otf ttf-liberation xorg-fonts-misc ttf-hack ttf-hack-nerd noto-fonts-emoji'
 AUDIO_PKGS='pipewire pipewire-pulse pipewire-audio pavucontrol'
-MISC_PKGS='acpi alsa-utils b43-fwcutter bash-completion bc cmake ctags expac 
+MISC_PKGS='acpi alsa-utils b43-fwcutter bash-completion libnotify bc cmake ctags expac 
 feh vlc gpm haveged hdparm htop inotify-tools ipython irssi 
 linux-atm lsof mercurial mesa mlocate moreutils mpv p7zip rsync 
 rtorrent screen scrot smartmontools strace tmux udisks2 unace unrar 
@@ -32,14 +33,14 @@ unzip upower usb_modeswitch usbutils zip man-db cargo python python-pip npm tftp
 NETWORK_PKGS='atftp bind-tools bridge-utils curl darkhttpd dhclient dhcpcd dialog
 dnscrypt-proxy dnsmasq dnsutils fwbuilder gnu-netcat iw 
 iwd lftp nfs-utils ntp openconnect openssh openvpn ppp pptpclient rfkill 
-rp-pppoe socat vpnc wget wireless_tools wpa_supplicant wvdial xl2tpd net-tools iputils'
+rp-pppoe socat vpnc wget wireless_tools wpa_supplicant wvdial xl2tpd net-tools iputils macchanger'
 XORG_PKGS='alacritty xf86-video-dummy xf86-video-fbdev xf86-video-sisusb 
 xf86-video-vesa xorg-server xorg-xbacklight xorg-xinit dex breeze-gtk'
-AUR_PKGS='https://aur.archlinux.org/intel-opencl-runtime.git'
+AUR_PKGS='https://aur.archlinux.org/intel-opencl-runtime.git https://aur.archlinux.org/rvm.git'
 ################ EXTRA PACKAGES #############
 
 DM_PKGS=('ly')
-WM_PKGS=( 'i3-wm' 'polybar' 'xss-lock' 'https://aur.archlinux.org/i3lock-color.git' 'dunst' 'rofi' 'https://aur.archlinux.org/rofi-greenclip.git' 'network-manager-applet' 'ranger' 'flameshot')
+WM_PKGS=( 'i3-wm' 'polybar' 'xss-lock' 'https://aur.archlinux.org/i3lock-color.git' 'dunst' 'rofi' 'https://aur.archlinux.org/rofi-greenclip.git' 'network-manager-applet' 'ranger' 'w3m' 'flameshot')
 
 # blackarch keyring version
 BA_KEYRING="https://blackarch.org/blackarch/blackarch/os/x86_64/blackarch-keyring-20180925-5-any.pkg.tar.zst"
@@ -48,7 +49,7 @@ BA_KEYRING="https://blackarch.org/blackarch/blackarch/os/x86_64/blackarch-keyrin
 GRUB_THEME="https://github.com/BiCH0/balam-grub.git"
 
 # path to blackarch-installer
-BI_PATH='/usr/share/balamos-install'
+BI_PATH='/usr/share/balamos-data'
 
 # true / false
 TRUE=0
@@ -166,7 +167,7 @@ SWAP_PART=''
 AVAILABLE_FS=('ext2' 'ext3' 'ext4' 'btrfs' 'zfs' 'ntfs')
 
 #other mountpoints
-DISK_MOUNTS=('')
+DISK_MOUNTS=()
 
 # boot fs type - default: ext4
 BOOT_FS_TYPE=''
@@ -182,11 +183,11 @@ NORMAL_USER=''
 
 # default BlackArch Linux repository URL
 #BA_REPO_URL='https://www.mirrorservice.org/sites/blackarch.org/blackarch/$repo/os/$arch'
-#BA_REPO_URL='https://blackarch.unixpeople.org/$repo/os/$arch'
-BA_REPO_URL='https://ftp.halifax.rwth-aachen.de/blackarch/$repo/os/$arch'
+BA_REPO_URL='https://blackarch.unixpeople.org/$repo/os/$arch'
+#BA_REPO_URL='https://ftp.halifax.rwth-aachen.de/blackarch/$repo/os/$arch'
 
 # default ArchLinux repository URL
-AR_REPO_URL='https://mirror.rackspace.com/archlinux/$repo/os/$arch'
+AR_REPO_URL='https://mirror.rackspace.com/archlinux/$repo/os/$arch https://mirror.moson.org/arch/$repo/os/$arch https://archmirror.it/repos/$repo/os/$arch'
 
 # VirtualBox setup - default: false
 VBOX_SETUP=$FALSE
@@ -221,19 +222,19 @@ JUST_A_COUNTER=0
 # Exit on CTRL + c
 clear_log(){
   grep -v -E 'BalamOs|----|... /' ${LOGFILE}.tmp > ${LOGFILE}2.tmp
-  mv ${LOGFILE}2.tmp ${LOGFILE}.tmp
+  mv ${LOGFILE}2.tmp ${LOGFILE}.log
   sed -Ei 's/\x1B\[[0-9;]*[JKmsu]//g; s/\x1B\[[()]?[0-9;]*[^HJKmsu]//g; s/\x1B\[1m//g; s/\r//g' ${LOGFILE}.log
 }
 
 ctrl_c() {
   echo 
-  clear_log
   err "Keyboard Interrupt detected, leaving..."
+  clear_log
+  umount_filesystems
   exit $FAILURE
 }
 
 trap ctrl_c 2
-
 
 # check exit status
 check()
@@ -286,7 +287,7 @@ warn()
 err()
 {
   printf "%s[-] ERROR: %s%s\n" "$RED" "$@" "$NC"
-
+  sleep 5
   return $FAILURE
 }
 
@@ -296,7 +297,7 @@ banner()
   columns="$(tput cols)"
   str="--==[ BalamOs Linux v$VERSION2 ($VERSION) ]==--"
 
-  printf "${RED}%*s${NC}\n" "${COLUMNS:-$(tput cols)}" | tr ' ' '-'
+  printf "${RED}%*s${NC}\n" "$columns" | tr ' ' '-'
 
   echo "$str" |
   while IFS= read -r line
@@ -305,7 +306,7 @@ banner()
       "$line" "$NC"
   done
 
-  printf "${RED}%*s${NC}\n\n\n" "${COLUMNS:-$(tput cols)}" | tr ' ' '-'
+  printf "${RED}%*s${NC}\n\n" "$columns" | tr ' ' '-'
 
   return $SUCCESS
 }
@@ -466,76 +467,119 @@ kill_job(){
 
 dependency_parser(){
   echo "[+] Parsing dependencies"
+  local mainPkg=""
+  if [ -n "$2" ]
+  then
+    mainPkg=$2
+  fi
   if [ ! -f "$1/PKGBUILD" ]
   then
 	  return 1
   fi
   local line
-  local read=0
+  local rl=0
   local dependencies=()
   while read line
   do
-	  case $line in
-      "depends=(")
+	  case "${line%%(*}" in
+      "depends=")
       ;&
-      "optdepends=(")
+      "optdepends=")
       ;&
-      "makedepends=(")
-        read=1
+      "makedepends=")
+        if [ -n "${line##*(}" ]
+        then
+          for dep in $(echo ${line##*(} | sed -E "s/:[a-zA-Z0-9\ -]+/'/g" | cut -f1 -d")")
+          do
+            dep=${dep//\'/}
+            if [[ $dep =~ [\>\=] ]]
+            then
+                dep=\"$dep\"
+            fi
+            dependencies+=($dep)
+          done
+          rl=0
+        else
+          rl=1
+        fi
       ;;
       ")")
-        read=0
+        rl=0
       ;;
       *)
-        if [ "$read" -eq 1 ]
+        if [ "$rl" -eq 1 ]
         then
-          dependencies+=($(echo ${line%:*} | sed "s/'//g"))
+          if [[ ! $line =~ [\>\=] ]]
+          then
+                line=${line//\'/}
+          fi
+          dependencies+=(${line%:*})
         fi
-	  esac
+    esac
   done < "$1/PKGBUILD"
   animation "Installing dependencies" &
+  echo "[DEPENDENCIES of $mainPkg]: ${dependencies[*]}" >> $VERBOSE
   local out=$(chroot $CHROOT pacman -Sy ${dependencies[*]} --needed --noconfirm 2>&1)
   kill_job "Installing"
+  out=$(echo "$out" | grep "target not found" | cut -f3 -d: | sed 's/ //g;')
+  if [ -n "$mainPkg" ] && [ "$(echo "$out" | grep -v $mainPkg)" != "$out" ]
+  then
+    err "Dependency cycle detected, skipping ${1##*/}"
+    return 1
+  fi
+  echo "[MISSING DEPENDENCIES]: $out" >> $VERBOSE
   if [ -n "$out" ]
   then
 	  local ecode=0
-	  local rm_pkgs=()
-    for pkg in $(echo "$out" | grep "target not found" | cut -f3 -d: | sed 's/ //g;')
+    for pkg in $(echo "$out")
     do
+      chroot $CHROOT pacman -Q $pkg &>/dev/null && continue
       rm -rf $CHROOT/tmp/$pkg
-      git_build $pkg https://aur.archlinux.org/$pkg.git
+      git_build $pkg https://aur.archlinux.org/$pkg.git $mainPkg
       if [ $? -ne 0 ]
       then
         ecode=$?
       fi
-      rm_pkgs+=($pkg)
+      dependencies=("${dependencies[@]/$pkg}")
     done
     if [ $ecode -eq 0 ]
     then
       animation "Installing dependencies" &
-      dependencies=($(comm -3 <(printf "%s\n" "${rm_pkgs[@]}" | sort) <(printf "%s\n" "${dependencies[@]}" | sort) | sort -n))
       chroot $CHROOT pacman -Sy ${dependencies[*]} --needed --noconfirm >> $VERBOSE 2>&1
+      ecode=$?
       kill_job "Installing"
-      return $?
+      return $ecode
     fi
   fi
+  return 0
 }
 
 git_build(){
+  local mainPkg="$1"
+  if [ -n "$3" ]
+  then
+    mainPkg=$3
+  fi
   local build_path="/tmp/$1"
   echo "[+] Downloading $1"
   chroot $CHROOT su $NORMAL_USER -c "git clone $2 $build_path" >> $VERBOSE 2>&1
+  echo "[+] Looking for keys"
+  local validKeys=$(grep validpgpkeys $CHROOT/$build_path/PKGBUILD | sed -E 's/.+\(//g;s/\).+//g')
+  if [ -n "$validKeys" ]
+  then
+    echo "[+] Installing keys"
+    chroot $CHROOT su $NORMAL_USER -c "gpg --recv-keys $validKeys" >> $VERBOSE 2>&1
+  fi
   animation "Building $1" &
   chroot $CHROOT su $NORMAL_USER -c "cd $build_path && makepkg --noconfirm" >> $VERBOSE 2>&1
   ecode=$?
   kill_job "Building"
   if [ "$ecode" -ne 0 ]
   then
-    printf "\r[~] %s [ERR]  " "Building $1"
+    printf "\r[~] %s ${RED}[ERR]${NC}  \n" "Building $1"
     if [ "$ecode" -eq 8 ]
     then
-      printf "\n"
-      dependency_parser $CHROOT/$build_path
+      dependency_parser "$CHROOT/$build_path" "$mainPkg"
       if [ $? -eq 0 ]
       then
         animation "Rebuilding $1" &
@@ -550,15 +594,13 @@ git_build(){
       return 1
     fi
   else
-    printf "\r[~] %s [OK]  " "Building $1"
+    printf "\r[~] %s ${GREEN}[OK]${NC}  \n" "Building $1"
   fi
-  printf "\n"
   animation "Installing $1" &
   local file_path=$(chroot $CHROOT sh -c "find $build_path -regex '.*\.pkg\.tar\.zst' | sort | head -1")
   chroot $CHROOT sh -c "pacman -U $file_path --noconfirm --needed" >> $VERBOSE 2>&1
   kill_job "Installing"
-  printf "\r[~] %s [OK]  " "Installing $1"
-  printf "\n"
+  printf "\r[~] %s ${GREEN}[OK]${NC}  \n" "Installing $1"
   return 0
 }
 
@@ -797,6 +839,7 @@ update_pkg_database()
   kill %1 2>/dev/null
   if [ $ecode -ne 0 ]
   then
+    clear_log
     exit 1
   fi
   return $SUCCESS
@@ -1271,12 +1314,12 @@ zero_part()
     if [ "$BOOT_MODE" = 'uefi' ] && ! echo $partinfo | grep -i 'EFI' ; then
       title 'Hard Drive Setup > Partitions'
       err 'You are booting in UEFI mode but not EFI partition was created, make sure you select the "EFI System" type for your EFI partition.'
-      sleep 2
+      sleep 4
       zero_part $disk
     elif ! echo $partinfo | grep -i "BIOS" && [ "$BIOS_GPT" == $TRUE ]; then
       title 'Hard Drive Setup > Partitions'
       err 'You are booting in BIOS mode but no BIOS partition was created, make sure to select the "BIOS boot" type for your BIOS partition.'
-      sleep 2
+      sleep 4
       zero_part $disk
     fi
   fi
@@ -1440,7 +1483,7 @@ make_luks_partition()
   printf "\n\n"
 
   cryptsetup -q -y -v --type luks2 luksFormat "$part" \
-    >> $VERBOSE 2>&1 || { err 'Could not LUKS format, trying again.'; make_luks_partition "$@"; }
+    >> $VERBOSE 2>&1 || { err 'Could not LUKS format, trying again.'; sleep 4; make_luks_partition "$@"; }
 
 }
 
@@ -1651,7 +1694,7 @@ mount_other_fs(){
   do
     part=${item%.*}
     mp=${item#*.}
-    if [ ${mp:0:1} == "/" ]
+    if [ "${mp:0:1}" == "/" ]
     then
       mp=${mp:1}
     fi
@@ -1694,7 +1737,7 @@ install_base_packages()
   warn 'This can take a while, please wait...'
   printf "\n"
   animation "Downloading packages" &
-  pacstrap $CHROOT base base-devel linux linux-firmware zsh git >> $VERBOSE 2>&1
+  pacstrap $CHROOT base base-devel linux linux-firmware zsh git terminus-font >> $VERBOSE 2>&1
   if [ $? -ne 0 ]
   then
     kill %1 2>/dev/null
@@ -2121,6 +2164,8 @@ setup_extra_packages()
       case $device in
           "NVIDIA")
           xorg=$xorg "nvidia nvidia-utils"
+          echo -e "[Trigger]\nOperation=Install\nOperation=Upgrade\nOperation=Remove\nType=Package\nTarget=nvidia\nTarget=linux\n\n[Action]\nDescription=Updating NVIDIA module in initcpio\nDepends=mkinitcpio\nWhen=PostTransaction\nNeedsTargets" > $CHROOT/etc/pacman.d/hooks/nvidia.hook
+          echo "Exec=/bin/sh -c 'while read -r trg; do case \$trg in linux*) exit 0; esac; done; /usr/bin/mkinitcpio -P'" >> $CHROOT/etc/pacman.d/hooks/nvidia.hook
           ;;
           "Intel")
           xorg=$xorg "xf86-video-intel vulkan-intel"
@@ -2225,7 +2270,7 @@ print_dots(){
     dotprofile=$(sed "${dotprofile}q;d" $BI_PATH/profiles.list 2>/dev/null)
     if [ -z "$dotprofile" ]
     then
-      dotprofile="13337"
+      dotprofile="1337"
     fi
   done
 }
@@ -2235,7 +2280,7 @@ pkgs_load(){
   local file=$2
   local -n array="$name"
   local res=()
-  for item in $(grep $1 $file | cut -f1 -d"=")
+  for item in $(grep $1 $file | grep -v "^#" | cut -f2 -d"=" | sed 's/\"//g;s/,/ /g')
   do
     res+=($item)
   done
@@ -2300,14 +2345,18 @@ prepare_cfiles(){
   title "Base System Setup > System settings"
 
   cp -r /usr/share/oh-my-zsh/themes/balamos*.zsh-theme $CHROOT/usr/share/oh-my-zsh/themes >> $VERBOSE 2>&1
-
   check $? "base dotfiles"
+
   print_dots
   echo "[+] Downloading $dotprofile dotfiles"
   animation "Cloning $dotprofile/balam-dotfiles.git" &
-  GIT_TERMINAL_PROMPT=0 git clone https://github.com/${dotprofile}/balam-dotfiles.git /tmp/${dotprofile}-dots >> $VERBOSE 2>&1
+  GIT_TERMINAL_PROMPT=0 git clone https://github.com/${dotprofile}/balam-dotfiles.git -b release /tmp/${dotprofile}-dots >> $VERBOSE 2>&1
   check $? "custom theme"
   kill_job "Cloning"
+
+  # This will help the updater keep track of your dotfiles
+  mkdir -p $CHROOT/$BI_PATH
+  echo -e "PATCH='$LAST_PATCH'\nDOTS='${dotprofile}'" > $CHROOT/$BI_PATH/lastpatch
 
   dotfiles_load "/tmp/${dotprofile}-dots"
 }
@@ -2403,11 +2452,14 @@ ask_mirror()
 
   local IFS='|'
   count=1
-  mirror_url='https://raw.githubusercontent.com/BlackArch/blackarch/master/mirror/mirror.lst'
+  mirror_url='https://balam.confugiradores.es/mirror.lst'
   mirror_file='/tmp/mirror.lst'
 
-  wprintf '[+] Fetching mirror list'
-  curl -s -o $mirror_file $mirror_url >> $VERBOSE
+  if [ ! -f "$mirror_file" ]
+  then
+    wprintf '[+] Fetching mirror list'
+    curl -sk -o $mirror_file $mirror_url >> $VERBOSE
+  fi
 
   while read -r country url mirror_name
   do
@@ -2415,7 +2467,7 @@ ask_mirror()
     printf "\n"
     wprintf "   * %s" "$url"
     printf "\n"
-    count=$((count + 1))
+    ((count++))
   done < "$mirror_file"
 
   printf "\n"
@@ -2435,9 +2487,17 @@ ask_mirror()
       "$(sed -n "${_a}p" $mirror_file | cut -d "|" -f 3)"
     printf "\n\n"
   fi
-  rm -f $mirror_file
-
-  return $SUCCESS
+  # bugfix: prevent unable to reach repository
+  wprintf "[+] Checking connection, wait a moment..."
+  ping -c5 -W 15 $BA_REPO_URL &>/dev/null
+  if [ $? -eq 0 ]
+  then
+    rm -f $mirror_file
+    return $SUCCESS
+  else
+    grep -v $BA_REPO_URL $mirror_file > $mirror_file.tmp
+    mv $mirror_file.tmp $mirror_file
+  fi
 }
 
 # ask for archlinux server
@@ -2456,7 +2516,7 @@ ask_mirror_arch()
     pacman -Sy --noconfirm >> $VERBOSE 2>&1
     pacman -S --needed --noconfirm reflector >> $VERBOSE 2>&1
     yes | pacman -Scc >> $VERBOSE 2>&1
-    reflector --verbose --latest 5 --protocol https --sort rate \
+    reflector --verbose -l 15 -f 5 --protocol https --sort rate \
       --save /etc/pacman.d/mirrorlist >> $VERBOSE 2>&1
     kill %1 2>/dev/null
   else
@@ -2466,7 +2526,7 @@ ask_mirror_arch()
     echo -e "## Arch Linux repository Worldwide mirrorlist\n\n" \
       > /etc/pacman.d/mirrorlist
 
-    for wore in $AR_REPO_URL
+    for wore in $(echo $AR_REPO_URL)
     do
       echo "Server = $wore" >> /etc/pacman.d/mirrorlist
     done
@@ -2510,8 +2570,9 @@ verify_keyring()
   then
     echo ""
     err "Invalid keyring signature. please stop by https://matrix.to/#/#/BlackaArch:matrix.org"
+  else
+    echo -e "${GREEN}[OK]${NC}" >> $VERBOSE
   fi
-  echo -e "${GREEN}[OK]${NC}" >> $VERBOSE
 }
 
 # run strap.sh
@@ -2525,7 +2586,7 @@ run_strap_sh()
   printf "\n"
   animation "Downloading keys" &
   local mirror_p="${CHROOT}/etc/pacman.d"
-  local mirror_r="https://blackarch.org"
+  local mirror_r="https://balam.confugiradores.es"
   local MIRROR_F="blackarch-mirrorlist"
   local GPG_CONF="${CHROOT}/etc/pacman.d/gnupg/gpg.conf"
 
@@ -2559,13 +2620,14 @@ run_strap_sh()
   animation "Populating keyring" &
   chroot $CHROOT pacman-key --recv-key F9A6E68A711354D84A9B91637533BAFE69A25079 >> $VERBOSE 2>&1
   echo "F9A6E68A711354D84A9B91637533BAFE69A25079:4:" >> $CHROOT/usr/share/pacman/keyrings/blackarch-trusted
-  chroot $CHROOT pacman-key --populate >> $VERBOSE 2>&1
+  chroot $CHROOT pacman-key --populate blackarch archlinux >> $VERBOSE 2>&1
 
   kill_job "Populating"
 
   echo ""
   echo "[+] Fetching new mirror list..." >> $VERBOSE
-  if ! curl -s "$mirror_r/$MIRROR_F" -o "$mirror_p/$MIRROR_F" ; then
+  if ! curl -sk "$mirror_r/$MIRROR_F" -o "$mirror_p/$MIRROR_F"
+  then
     err "We couldn't fetch the mirror list from: $mirror_r/$MIRROR_F"
   fi
 
@@ -2583,7 +2645,7 @@ run_strap_sh()
 
   # copy balam os updater to final system
   cp /usr/bin/balamos-update ${CHROOT}/usr/bin/balamos-update
-  cp /usr/share/balamos_lastpatch ${CHROOT}/usr/share/balamos_lastpatch
+  cp -r $BI_PATH ${CHROOT}$BI_PATH
 
   return $SUCCESS
 }
@@ -2611,20 +2673,21 @@ setup_display_manager()
   print_pkgs ${DM_PKGS[@]}
   printf "\n"
   animation "Downloading packages" &
-  # install ligthdm packages
-  local pkgs=$(extra_pkgs_cleanup ${DM_PKGS[@]})
 
+  local pkgs=$(extra_pkgs_cleanup ${DM_PKGS[@]})
   chroot $CHROOT pacman -S ${pkgs%|*}  --needed --overwrite='*' \
     --noconfirm >> $VERBOSE 2>&1
   kill_job "Downloading"
-  printf "\r[~] Downloading packages... [OK]"
+  printf "\r[~] Downloading packages... [OK]\n"
+
   for pkg in ${pkgs#*|}
   do
     git_build $(echo ${pkg##*/} | cut -f1 -d.) $pkg
   done
+
   rm -fr $CHROOT/etc/systemd/system/getty@tty1.service.d/
 
-  # config files
+  # Copy icons and fonts to chroot
   cp -r /usr/share/icons/. "$CHROOT/usr/share/icons/."
   mkdir -p $CHROOT/usr/share/fonts/{TTF,opentype}
   cp /usr/share/fonts/opentype/{conthrax-sb,DroidSansMNerdFontMono-Regular}.otf $CHROOT/usr/share/fonts/opentype/
@@ -2632,6 +2695,7 @@ setup_display_manager()
 
   chroot $CHROOT systemctl enable ${pkgs%%|*} >> $VERBOSE 2>&1
 
+  # TODO add support for other greeters
   if [[ ${pkgs[@]} =~ ly ]]
   then
     cp -f /tmp/${dotprofile}-dots/ly.conf $CHROOT/etc/ly/config.ini
@@ -2673,9 +2737,9 @@ setup_window_managers()
   for pkg in ${pkgs#*|}
   do
     git_build $(echo ${pkg##*/} | cut -f1 -d.) $pkg
-
   done
 
+  # Copy live desktop files to chroot
   cp -r "/usr/share/xsessions/i3.desktop" "$CHROOT/usr/share/xsessions"
 
   # wallpaper
@@ -2828,6 +2892,9 @@ setup_blackarch_tools()
     done
   fi
 
+  # This will help the updater keep track of your toolset
+  echo -e "DOTTOOLS='$dotprofile'\nDATE='$(date +%Y/%m/%dT%H:%M:%SZ)'" >> $CHROOT/$BI_PATH/lastpatch
+
   return $SUCCESS
 }
 
@@ -2902,7 +2969,7 @@ setup_blackarch()
 # for fun and lulz
 easter_backdoor()
 {
-  bar=0
+  local bar=0
 
   title 'Game Over'
 
@@ -2914,9 +2981,9 @@ easter_backdoor()
   do
     wprintf "."
     sleep 1
-    bar=$((bar + 1))
+    ((bar++))
   done
-  printf " >> ${BLINK}${WHITE}HACK THE PLANET! D00R THE PLANET!${NC} <<"
+  printf "\n>> ${BLINK}${WHITE}HACK THE PLANET! D00R THE PLANET!${NC} <<"
   printf "\n\n"
 
   return $SUCCESS

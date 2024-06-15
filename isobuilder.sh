@@ -426,7 +426,6 @@ echo "exec_always --no-startup-id /home/balam/fixer.sh" >> ${WORKDIR}/liveiso/ai
 
 info "Injecting updater.sh"
 cp "${WORKDIR}/updater.sh" "${WORKDIR}/liveiso/airootfs/usr/bin/balamos-update"
-grep "UPDATER_VERSION=" "${WORKDIR}/updater.sh" | sed -E "s/.+=//g;s/'//g" > "${WORKDIR}/liveiso/airootfs/usr/share/balamos_lastpatch"
 
 info "Starting building process"
 sudo mkarchiso -v -r -w ${WORKDIR}/workdir -o ${WORKDIR}/out ${WORKDIR}/liveiso

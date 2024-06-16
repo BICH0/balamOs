@@ -11,7 +11,7 @@
 
 # blackarch-installer version
 VERSION='1.2.24'
-VERSION2='1.0.3'
+VERSION2='1.0.4'
 LAST_PATCH='0.0.0'
 
 ################ BASE PACKAGES #############
@@ -2370,6 +2370,11 @@ prepare_cfiles(){
   animation "Cloning $dotprofile/balam-dotfiles.git" &
   GIT_TERMINAL_PROMPT=0 git clone https://github.com/${dotprofile}/balam-dotfiles.git -b release /tmp/${dotprofile}-dots >> $VERBOSE 2>&1
   check $? "custom theme"
+  if [ $? -ne 0 ]
+  then
+    echo -e "${RED}[ERR]${NC} Profile not found, choose another"
+    prepare_cfiles
+  fi
   kill_job "Cloning"
 
   # This will help the updater keep track of your dotfiles
@@ -2874,9 +2879,15 @@ setup_blackarch_tools()
   fi
   if [ ! -f /tmp/${dotprofile}-dots/tools.list ]
   then
-    err "Tools not found, so no 1337 4 u."
+    err "Tools not found, so no 1337 4 u. Unless..."
     sleep 2
-    return $FALSE
+    if confirm 'BalamOs Linux Setup > Tools' "[?] Do you wanna use another profile? [y/n]"
+    then
+      setup_blackarch_tools
+      return $?
+    else
+      return $FALSE
+    fi
   fi
 
   wprintf "[+] Installing $dotprofile's toolset:\n"

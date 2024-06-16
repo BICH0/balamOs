@@ -285,7 +285,7 @@ do
 
 	fi
 	echo -en "  [${name}]\n    - Cloning repo"
-	git clone --quiet $pkg
+	git -c init.defaultBranch=master clone --quiet $pkg 
 	checkOutput
 	if [ ! -d $pkgpath ]
 	then

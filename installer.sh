@@ -11,7 +11,7 @@
 
 # blackarch-installer version
 VERSION='1.2.24'
-VERSION2='1.0.2'
+VERSION2='1.0.3'
 LAST_PATCH='0.0.0'
 
 ################ BASE PACKAGES #############
@@ -564,9 +564,27 @@ git_build(){
   echo "[+] Downloading $1"
   chroot $CHROOT su $NORMAL_USER -c "git clone $2 $build_path" >> $VERBOSE 2>&1
   echo "[+] Looking for keys"
-  local validKeys=$(grep validpgpkeys $CHROOT/$build_path/PKGBUILD | sed -E 's/.+\(//g;s/\).+//g')
-  if [ -n "$validKeys" ]
+  if [ -n "$(grep validpgpkeys $CHROOT/$build_path/PKGBUILD)" ]
   then
+    local validKeys=$(grep validpgpkeys $CHROOT/$build_path/PKGBUILD | sed -E 's/.+\(//g;s/\).+//g')
+    if [ -z "$validKeys" ]
+    then
+      for line in $(cat $CHROOT/$build_path/PKGBUILD)
+      do
+        if [ "$line" == "validpgpkeys=(" ]
+        then
+          readLine=1
+        elif [ "$line" == ")" ]
+        then
+          readLine=0
+        else
+          if [ $readLine -eq 1 ]
+          then
+            validKeys+="${line//\'/} "
+          fi
+        fi
+      done
+    fi
     echo "[+] Installing keys"
     chroot $CHROOT su $NORMAL_USER -c "gpg --recv-keys $validKeys" >> $VERBOSE 2>&1
   fi
@@ -2506,7 +2524,7 @@ ask_mirror_arch()
   local mirrold='cp /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.backup'
 
   if confirm 'Pacman Setup > ArchLinux Mirrorlist' \
-    "[+] Worldwide mirror will be used\n\n[?] Look for the best server [y/n]: "
+    "[+] Worldwide mirror will be used\n\n[?] Look for the best server [Y/n]: " "y"
   then
     printf "\n"
     warn 'This may take time depending on your connection'

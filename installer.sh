@@ -569,6 +569,7 @@ git_build(){
     local validKeys=$(grep validpgpkeys $CHROOT/$build_path/PKGBUILD | sed -E 's/.+\(//g;s/\).+//g')
     if [ -z "$validKeys" ]
     then
+      local readLine=0
       for line in $(cat $CHROOT/$build_path/PKGBUILD)
       do
         if [ "$line" == "validpgpkeys=(" ]

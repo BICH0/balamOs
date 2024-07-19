@@ -219,6 +219,9 @@ CNF_MSGS=('I think you should really think about it' 'Fr fr, give it a thought' 
 # just a counter
 JUST_A_COUNTER=0
 
+#Tells the script to umount all the partitions or not (for post installation setup)
+NO_UMOUNT=$FALSE
+
 # Exit on CTRL + c
 clear_log(){
   grep -v -E 'BalamOs|----|... /' ${LOGFILE}.tmp > ${LOGFILE}2.tmp
@@ -880,7 +883,7 @@ update_pacman()
 # ask user for hostname
 ask_hostname()
 {
-  while [ -z "$HOST_NAME" ] || [[ ! $HOST_NAME =~ ^[a-zA-Z0-9]{3,}$ ]]
+  while [ -z "$HOST_NAME" ] || [[ ! $HOST_NAME =~ ^[a-zA-Z0-9][a-zA-Z0-9_.]{2,}$ ]]
   do
     title 'Network Setup > Hostname'
     wprintf '[?] Set your hostname: '
@@ -2223,7 +2226,7 @@ setup_extra_packages()
   > Network     : $(echo "$NETWORK_PKGS" | wc -w) packages
   > Xorg        : $(echo "$XORG_PKGS" | wc -w) packages
   \n"
-
+  sleep 2
   warn 'This can take a while, please wait...'
   printf "\n"
   animation "Installing packages" &
@@ -2701,8 +2704,21 @@ setup_display_manager()
   local pkgs=$(extra_pkgs_cleanup ${DM_PKGS[@]})
   chroot $CHROOT pacman -S ${pkgs%|*}  --needed --overwrite='*' \
     --noconfirm >> $VERBOSE 2>&1
+  local ecode=$?
   kill_job "Downloading"
-  printf "\r[~] Downloading packages... [OK]\n"
+  printf "\r[~] Downloading packages... "
+  if [ "$ecode" -ne 0 ]
+  then
+    printf "[ERROR]\n Packages could not be installed due to the above reasons"
+    if confirm "Do you want to proceed without them?\n You can install them after the installation ends Y/n" "y" 
+    then
+      NO_UMOUNT=$TRUE
+    else
+      setup_display_manager
+    fi
+  else
+    printf "[OK]\n"
+  fi
 
   for pkg in ${pkgs#*|}
   do
@@ -3163,7 +3179,12 @@ main()
   setup_blackarch
 
   # epilog
-  umount_filesystems
+  if [ $NO_UMOUNT -eq $TRUE ]
+  then
+    printf "Filesystems will not be umounted\nTo make changes on the newly installed system use: chroot $ROOT_PART\n"
+  else
+    umount_filesystems
+  fi
   sync_disk
   easter_backdoor
 

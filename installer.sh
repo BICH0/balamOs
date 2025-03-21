@@ -2023,7 +2023,8 @@ EOF
     sed -Ei "s|Arch|Balam|g;s|#GRUB_COLOR_|GRUB_COLOR_|g;\
     s|#GRUB_THEME=.*|GRUB_THEME=\"/boot/grub/themes/balam-grub/theme\.txt\"|g;\
     s|GRUB_COLOR_NORMAL=\"light-blue/black\"|GRUB_COLOR_NORMAL=\"red/black\"|g;\
-    s|GRUB_COLOR_HIGHLIGHT=\"light-cyan/blue\"|GRUB_COLOR_HIGHLIGHT=\"light-red/black\"|g"\
+    s|GRUB_COLOR_HIGHLIGHT=\"light-cyan/blue\"|GRUB_COLOR_HIGHLIGHT=\"light-red/black\"|g;\
+    s|GRUB_CMDLINE_LINUX=\"|GRUB_CMDLINE_LINUX=\"net.ifnames=0 biosdevname=0|g"\
      $CHROOT/etc/default/grub
     sed -i "s/menuentry '\$LABEL'/menuentry '\$LABEL' --class efi/g" "$CHROOT/etc/grub.d/30_uefi-firmware"
     if [ "$BOOT_MODE" = 'uefi' ]

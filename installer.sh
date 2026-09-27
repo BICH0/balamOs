@@ -18,7 +18,7 @@ LAST_PATCH='0.0.0'
 
 KERNEL_PKGS='linux-headers'
 ARCH_PKGS='arch-install-scripts pkgfile'
-BT_PKGS='bluez bluez-hid2hci bluez-tools bluez-utils'
+BT_PKGS='bluez bluez-hid2hci bluez-tools bluez-utils blueman'
 BROWSER_PKGS='firefox'
 EDITOR_PKGS='hexedit nano nano-syntax-highlighting neovim'
 FS_PKGS='cifs-utils dmraid dosfstools exfat-utils f2fs-tools 
@@ -35,7 +35,7 @@ dnscrypt-proxy dnsmasq dnsutils fwbuilder gnu-netcat iw
 iwd lftp nfs-utils ntp openconnect openssh openvpn ppp pptpclient rfkill 
 rp-pppoe socat vpnc wget wireless_tools wpa_supplicant wvdial xl2tpd net-tools iputils macchanger'
 XORG_PKGS='alacritty xf86-video-dummy xf86-video-fbdev xf86-video-sisusb 
-xf86-video-vesa xorg-server xorg-xbacklight xorg-xinit dex breeze-gtk'
+xf86-video-vesa xorg-server xorg-xbacklight xorg-xinit dex breeze-gtk brightnessctl touchegg'
 AUR_PKGS='https://aur.archlinux.org/intel-opencl-runtime.git https://aur.archlinux.org/rvm.git'
 ################ EXTRA PACKAGES #############
 
@@ -2463,6 +2463,10 @@ update_etc()
   # /etc/*
   cp -r "/etc/"{arch-release,issue,motd,os-release,sysctl.d,systemd,lsb-release} "$CHROOT/etc/." >> $VERBOSE 2>&1
 
+  # /etc/X11/xorg.conf.d (touchpad: natural scrolling + tap to click)
+  mkdir -p "$CHROOT/etc/X11/xorg.conf.d"
+  cp -r "/etc/X11/xorg.conf.d/." "$CHROOT/etc/X11/xorg.conf.d/" >> $VERBOSE 2>&1
+
   # /usr/lib/lsb-release
   cp "/usr/lib/lsb-release" "$CHROOT/usr/lib/" >> $VERBOSE 2>&1
 
@@ -2719,6 +2723,7 @@ setup_display_manager()
   cp /usr/share/fonts/TTF/HackNFM-Regular.ttf $CHROOT/usr/share/fonts/TTF/
 
   chroot $CHROOT systemctl enable ${pkgs%%|*} >> $VERBOSE 2>&1
+  chroot $CHROOT systemctl enable bluetooth.service touchegg.service >> $VERBOSE 2>&1
 
   # TODO add support for other greeters
   if [[ ${pkgs[@]} =~ ly ]]
